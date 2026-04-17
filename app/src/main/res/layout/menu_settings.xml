@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0D0D0D"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:clickable="true"
+    android:focusable="true">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="30dp"
+        tools:ignore="UseCompoundDrawables">
+        <ImageView
+            android:id="@+id/btn_back"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@drawable/draw_forward"
+            android:rotation="180"
+            android:padding="12dp"
+            android:contentDescription="@string/desc_back"
+            android:foreground="?attr/selectableItemBackgroundBorderless" />
+        <TextView
+            android:id="@+id/bar_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="48dp"
+            android:text="@string/settings_title"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:fontFamily="@font/poppins_extrabold" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/select_theme"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp"
+        android:fontFamily="@font/poppins_regular" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:background="@drawable/draw_panel"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:layout_marginBottom="30dp"
+        android:gravity="center_vertical">
+        <View
+            android:id="@+id/t_purple"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/draw_theme"
+            android:tag="#9C27B0" />
+        <View
+            android:id="@+id/t_red"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/draw_theme"
+            android:tag="#FF0000" />
+        <View
+            android:id="@+id/t_blue"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/draw_theme"
+            android:tag="#2196F3" />
+        <View
+            android:id="@+id/t_green"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/draw_theme"
+            android:tag="#4CAF50" />
+
+        <View
+            android:id="@+id/t_pink"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/draw_theme"
+            android:tag="#E91E63" />
+        <View
+            android:id="@+id/t_cyan"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/draw_theme"
+            android:tag="#00BCD4" />
+        <View
+            android:id="@+id/t_orange"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/draw_theme"
+            android:tag="#FF9800" />
+        <View
+            android:id="@+id/t_teal"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:background="@drawable/draw_theme"
+            android:tag="#009688" />
+    </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_clear"
+        style="@style/OutlinedThemeButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:minHeight="56dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:text="@string/clear_system_logs_dalvik_reboot"
+        android:textSize="14sp"
+        android:textColor="#FFFFFF"
+        android:fontFamily="@font/poppins_regular" />
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_reboot"
+        style="@style/OutlinedThemeButton"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="@string/reboot_device"
+        android:textColor="#FFFFFF"
+        android:fontFamily="@font/poppins_regular" />
+</LinearLayout>

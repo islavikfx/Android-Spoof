@@ -1,0 +1,3 @@
+-dontwarn javax.annotation.**
+-dontwarn javax.lang.model.**
+-dontwarn org.codehaus.mojo.**
