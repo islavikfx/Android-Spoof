@@ -1,8 +1,7 @@
 plugins {
-    alias(libs.plugins.android.application) apply false
-    alias(libs.plugins.kotlin.android) apply false
+    id("com.android.application") version "9.2.0" apply false
+    id("org.jetbrains.kotlin.android") version "2.3.21" apply false
 }
-
 
 tasks.register("clean", Delete::class) {
     delete(rootProject.layout.buildDirectory)
