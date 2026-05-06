@@ -7,7 +7,6 @@ pluginManagement {
 }
 
 
-@Suppress("UnstableApiUsage")
 dependencyResolutionManagement {
     repositories {
         google()
