@@ -12,17 +12,18 @@
         android:orientation="vertical"
         android:gravity="center"
         android:layout_marginBottom="16dp">
+
         <TextView
             android:id="@+id/msg_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
-            android:textStyle="bold"
+            android:layout_marginBottom="4dp"
+            android:ellipsize="end"
             android:gravity="center"
             android:maxLines="1"
-            android:ellipsize="end"
-            android:layout_marginBottom="4dp" />
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold" />
         <TextView
             android:id="@+id/msg_pkg"
             android:layout_width="wrap_content"
@@ -38,7 +39,7 @@
         android:layout_height="wrap_content"
         android:text="@string/reboot_question"
         android:textColor="#CCCCCC"
-        android:textSize="13sp"
+        android:textSize="14sp"
         android:gravity="center"
         android:layout_marginBottom="20dp"
         android:fontFamily="@font/poppins_semibold"/>

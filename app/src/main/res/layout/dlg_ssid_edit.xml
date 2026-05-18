@@ -33,7 +33,7 @@
             android:textSize="14sp"
             android:background="@android:color/transparent"
             android:inputType="text"
-            android:hint="@string/enter_new_value"
+            android:hint="@string/type_here"
             android:autofillHints="no"
             android:fontFamily="@font/poppins_regular" />
     </com.google.android.material.card.MaterialCardView>
@@ -51,10 +51,9 @@
         android:layout_height="wrap_content"
         android:textColor="#CCCCCC"
         android:textSize="12sp"
-        android:layout_marginBottom="4dp"
+        android:layout_marginBottom="8dp"
         android:fontFamily="@font/poppins_regular" />
     <TextView
-        android:id="@+id/dlg_warning_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/warning_id_reset"
@@ -62,30 +61,36 @@
         android:textSize="11sp"
         android:layout_marginBottom="16dp"
         android:fontFamily="@font/poppins_extrabold" />
-    <LinearLayout
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_apply_reboot"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="8dp">
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_cancel"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="8dp"
-            android:text="@string/cancel"
-            android:textColor="#FFFFFF"
-            app:cornerRadius="24dp"
-            android:fontFamily="@font/poppins_medium" />
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_save"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:text="@string/action_apply"
-            android:textColor="#FFFFFF"
-            app:cornerRadius="24dp"
-            android:fontFamily="@font/poppins_medium" />
-    </LinearLayout>
+        android:layout_height="48dp"
+        android:text="@string/apply_reboot"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        app:cornerRadius="24dp"
+        android:layout_marginBottom="8dp"
+        android:fontFamily="@font/poppins_medium" />
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_apply"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="@string/action_apply"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        app:cornerRadius="24dp"
+        android:layout_marginBottom="8dp"
+        android:fontFamily="@font/poppins_medium" />
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_cancel"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="@string/cancel"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        app:cornerRadius="24dp"
+        android:fontFamily="@font/poppins_medium" />
 </LinearLayout>

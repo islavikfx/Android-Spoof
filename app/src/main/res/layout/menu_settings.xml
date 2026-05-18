@@ -21,7 +21,7 @@
             android:layout_height="48dp"
             android:src="@drawable/draw_forward"
             android:rotation="180"
-            android:padding="12dp"
+            android:padding="13dp"
             android:contentDescription="@string/desc_back"
             android:foreground="?attr/selectableItemBackgroundBorderless" />
         <TextView
@@ -37,7 +37,6 @@
             android:gravity="center"
             android:fontFamily="@font/poppins_extrabold" />
     </LinearLayout>
-
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -120,7 +119,6 @@
             android:background="@drawable/draw_theme"
             android:tag="#009688" />
     </LinearLayout>
-
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_clear"
         style="@style/OutlinedThemeButton"

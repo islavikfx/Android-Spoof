@@ -26,7 +26,8 @@
                 android:layout_height="wrap_content"
                 android:textColor="#FFFFFF"
                 android:textSize="14sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:fontFamily="@font/poppins_bold" />
             <TextView
                 android:id="@+id/prop_v"
                 android:layout_width="wrap_content"
@@ -35,7 +36,8 @@
                 android:textSize="11sp"
                 android:layout_marginTop="2dp"
                 android:maxLines="2"
-                android:ellipsize="end" />
+                android:ellipsize="end"
+                android:fontFamily="@font/poppins_regular" />
         </LinearLayout>
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/edit_ctr"
@@ -52,13 +54,14 @@
                 android:text="@string/action_edit"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                android:paddingStart="20dp"
-                android:paddingEnd="20dp"
+                android:paddingStart="21dp"
+                android:paddingEnd="21dp"
                 android:gravity="center"
                 android:foreground="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
-                android:minHeight="48dp" />
+                android:minHeight="48dp"
+                android:fontFamily="@font/poppins_bold" />
         </com.google.android.material.card.MaterialCardView>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

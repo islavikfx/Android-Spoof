@@ -37,7 +37,6 @@
             android:textStyle="bold"
             android:gravity="center" />
     </LinearLayout>
-
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -92,7 +91,6 @@
                         android:paddingStart="8dp"
                         android:paddingEnd="8dp" />
                 </LinearLayout>
-
             </com.google.android.material.card.MaterialCardView>
             <TextView
                 android:id="@+id/tv_warn"
