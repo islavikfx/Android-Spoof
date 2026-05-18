@@ -1,6 +1,5 @@
 -dontwarn javax.annotation.**
 -dontwarn javax.lang.model.**
--dontwarn org.codehaus.mojo.**
 -dontwarn java.lang.invoke.**
 -dontwarn java.lang.management.**
--dontwarn java.lang.ClassValue
+-dontwarn org.codehaus.mojo.**
