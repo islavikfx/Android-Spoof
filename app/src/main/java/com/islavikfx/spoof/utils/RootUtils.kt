@@ -1,44 +1,31 @@
 package com.islavikfx.spoof.utils
+import android.content.Context
 import com.topjohnwu.superuser.Shell
 
 
 object RootUtils {
 
+    private var initialized = false
+    fun init(context: Context) {
+        if (initialized) return
+        SELinuxBypass.init(context)
+        initialized = true
+    }
+
     fun isRootAvailable(): Boolean {
         return try {
             Shell.getShell().isRoot
         } catch (_: Exception) {
-            false }
+            false
+        }
     }
-
-    @Suppress("unused")
-    fun executeCommand(vararg commands: String): Boolean {
-        return try {
-            val result = Shell.cmd(*commands).exec()
-            result.isSuccess
-        } catch (_: Exception) {
-            false }
-    }
-
-    @Suppress("unused")
-    fun executeCommandWithResult(vararg commands: String): Shell.Result {
-        return Shell.cmd(*commands).exec() }
 
     fun fileExists(path: String): Boolean {
         return try {
-            val result = Shell.cmd("test -e $path && echo EXISTS || echo NOT_EXISTS").exec()
-            result.out.firstOrNull() == "EXISTS"
+            val result = Shell.cmd("test -e $path && echo 1 || echo 0").exec()
+            result.out.firstOrNull() == "1"
         } catch (_: Exception) {
-            false }
+            false
+        }
     }
-
-    @Suppress("unused")
-    fun directoryExists(path: String): Boolean {
-        return try {
-            val result = Shell.cmd("test -d $path && echo EXISTS || echo NOT_EXISTS").exec()
-            result.out.firstOrNull() == "EXISTS"
-        } catch (_: Exception) {
-            false }
-    }
-
 }
