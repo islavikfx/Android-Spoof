@@ -10,34 +10,37 @@ import com.islavikfx.spoof.AppActivity
 
 abstract class BaseMenu : Fragment() {
 
-    protected lateinit var act: AppActivity
+    protected lateinit var activity: AppActivity
+
     abstract fun draw(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View
     abstract fun setup(view: View, state: Bundle?)
     abstract fun title(): String
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
-        act = requireActivity() as AppActivity }
+        activity = requireActivity() as AppActivity
+    }
 
-    override fun onCreateView(inflater: LayoutInflater,
-        container: ViewGroup?,
-        state: Bundle?): View = draw(inflater, container, state)
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View {
+        return draw(inflater, container, state)
+    }
 
     override fun onViewCreated(view: View, state: Bundle?) {
         super.onViewCreated(view, state)
-        setup(view, state) }
+        setup(view, state)
+    }
 
-    protected fun toast(msg: String) {
-        Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show() }
+    protected fun showToast(message: String) {
+        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+    }
 
     protected fun isRootAvailable(): Boolean {
-        return if (!act.isRt()) {
-            toast(getString(com.islavikfx.spoof.R.string.no_root_access))
-            false
-        } else {
-            true
-        } }
+        if (!activity.hasRoot()) {
+            showToast(getString(com.islavikfx.spoof.R.string.no_root_access))
+            return false
+        }
+        return true
+    }
 
-    protected fun getThemeColor(): String = act.getCol()
-
+    protected fun getThemeColor(): String = activity.getThemeColor()
 }
