@@ -1,8 +1,8 @@
 package com.islavikfx.spoof.menus
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
-import android.os.Environment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -12,7 +12,6 @@ import androidx.core.graphics.toColorInt
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.islavikfx.spoof.R
-import com.islavikfx.spoof.AppActivity
 import com.topjohnwu.superuser.Shell
 import java.util.UUID
 
@@ -31,36 +30,47 @@ class AdIdMenu : BaseMenu() {
     private val adidFilePath = "$gmsDataDir/shared_prefs/adid_settings.xml"
 
     override fun draw(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View {
-        return inflater.inflate(R.layout.menu_adid, container, false) }
+        return inflater.inflate(R.layout.menu_adid, container, false)
+    }
 
-    override fun setup(view: View, state: Bundle?) { setupBackButton(view)
+    override fun setup(view: View, state: Bundle?) {
+        setupBackButton(view)
         setupTitle(view)
         initializeViews(view)
         setupCheckboxes()
         setupApplyButton()
         applyTheme()
-        loadCurrentAdvertisingId() }
+        loadCurrentAdvertisingId()
+    }
 
     private fun setupBackButton(view: View) {
         view.findViewById<ImageView>(R.id.btn_back).setOnClickListener {
-            parentFragmentManager.popBackStack() }
+            parentFragmentManager.popBackStack()
+        }
     }
 
     private fun setupTitle(view: View) {
-        view.findViewById<TextView>(R.id.bar_title).text = title() }
+        view.findViewById<TextView>(R.id.bar_title).text = title()
+    }
 
-    private fun initializeViews(view: View) { forceCheckbox = view.findViewById(R.id.chk_force)
+    private fun initializeViews(view: View) {
+        forceCheckbox = view.findViewById(R.id.chk_force)
         resetCheckbox = view.findViewById(R.id.chk_reset)
         clearCheckbox = view.findViewById(R.id.chk_clear)
         idTextView = view.findViewById(R.id.txt_id)
-        applyButton = view.findViewById(R.id.btn_go) }
+        applyButton = view.findViewById(R.id.btn_go)
+    }
 
-    private fun setupCheckboxes() { forceCheckbox.isChecked = true
+    private fun setupCheckboxes() {
+        forceCheckbox.isChecked = true
         resetCheckbox.isChecked = true
-        clearCheckbox.isChecked = false }
+        clearCheckbox.isChecked = false
+    }
 
-    private fun setupApplyButton() { applyButton.setOnClickListener {
-            if (isRootAccessAvailable()) execute() }
+    private fun setupApplyButton() {
+        applyButton.setOnClickListener {
+            if (isRootAccessAvailable()) execute()
+        }
     }
 
     private fun applyTheme() {
@@ -79,12 +89,10 @@ class AdIdMenu : BaseMenu() {
         Thread {
             try {
                 val currentId = getCurrentAdvertisingId()
-                handler.post {
-                    idTextView.text = getString(R.string.current_id_placeholder, currentId)
-                }
-            } catch (@Suppress("UNUSED_PARAMETER") _: Exception) {
-                handler.post {
-                    idTextView.text = getString(R.string.current_id_placeholder, getString(R.string.error)) } }
+                handler.post { idTextView.text = getString(R.string.current_id_placeholder, currentId) }
+            } catch (_: Exception) {
+                handler.post { idTextView.text = getString(R.string.current_id_placeholder, getString(R.string.error)) }
+            }
         }.start()
     }
 
@@ -99,34 +107,48 @@ class AdIdMenu : BaseMenu() {
 
     private fun execute() {
         if (!areGoogleServicesInstalled()) {
-            toast(getString(R.string.no_google_services))
+            showToast(getString(R.string.no_google_services))
             return }
-
         Thread {
             try {
+                val nothingSelected = !forceCheckbox.isChecked && !resetCheckbox.isChecked && !clearCheckbox.isChecked
                 forceStopGoogleServices()
+                var hasPerformedOtherActions = false
                 if (resetCheckbox.isChecked) {
-                    resetAdvertisingId() }
+                    resetAdvertisingId()
+                    hasPerformedOtherActions = true
+                }
                 if (clearCheckbox.isChecked) {
-                    clearGoogleServicesData() }
+                    clearGoogleServicesData()
+                    hasPerformedOtherActions = true
+                }
                 restartGoogleServices()
-                handler.post { toast(getString(R.string.ad_id_updated)) }
-            } catch (@Suppress("UNUSED_PARAMETER") _: Exception) { }
+                when {
+                    nothingSelected -> {}
+                    forceCheckbox.isChecked && !resetCheckbox.isChecked && !clearCheckbox.isChecked -> {
+                        handler.post { showToast(getString(R.string.only_force_stop_performed)) } }
+                    hasPerformedOtherActions -> {
+                        handler.post { showToast(getString(R.string.ad_id_updated)) } }
+                }
+            } catch (_: Exception) { }
         }.start()
     }
 
     private fun forceStopGoogleServices() {
         if (!forceCheckbox.isChecked) return
-        Shell.cmd("am force-stop com.google.android.gsf",
-            "am force-stop com.google.android.gms").exec() }
+        Shell.cmd("am force-stop com.google.android.gsf", "am force-stop com.google.android.gms").exec()
+    }
 
     private fun resetAdvertisingId() {
-        Shell.cmd("rm -rf $gmsDataDir/app_ads_cache", "rm -rf $gmsDataDir/app_dg_cache", "rm -rf $gmsDataDir/cache").exec()
+        Shell.cmd(
+            "rm -rf $gmsDataDir/app_ads_cache", "rm -rf $gmsDataDir/app_dg_cache", "rm -rf $gmsDataDir/cache").exec()
         val newId = UUID.randomUUID().toString()
         val xmlContent = createAdIdXmlContent(newId)
         Shell.cmd("echo '$xmlContent' > $adidFilePath").exec()
         Shell.cmd("chmod 660 $adidFilePath").exec()
-        handler.post { idTextView.text = getString(R.string.current_id_placeholder, newId) }
+        handler.post {
+            idTextView.text = getString(R.string.current_id_placeholder, newId)
+        }
     }
 
     private fun createAdIdXmlContent(adId: String): String {
@@ -151,22 +173,22 @@ class AdIdMenu : BaseMenu() {
     }
 
     private fun areGoogleServicesInstalled(): Boolean {
-        val gmsExists = runCatching { val result = Shell.cmd("test -d $gmsDataDir && echo 1 || echo 0").exec()
+        val gmsExists = runCatching {
+            val result = Shell.cmd("test -d $gmsDataDir && echo 1 || echo 0").exec()
             result.out.firstOrNull() == "1" }.getOrElse { false }
-
         val gsfExists = runCatching {
             val result = Shell.cmd("test -d $gsfDataDir && echo 1 || echo 0").exec()
             result.out.firstOrNull() == "1" }.getOrElse { false }
-
         return gmsExists || gsfExists
     }
 
     private fun isRootAccessAvailable(): Boolean {
-        return (activity as? AppActivity)?.isRt() ?: false }
+        return activity.hasRoot()
+    }
 
     private fun getCurrentThemeColor(): String {
-        return (activity as? AppActivity)?.getCol() ?: "#9C27B0" }
+        return activity.getThemeColor()
+    }
 
     override fun title(): String = getString(R.string.advertising_id_settings)
-
 }

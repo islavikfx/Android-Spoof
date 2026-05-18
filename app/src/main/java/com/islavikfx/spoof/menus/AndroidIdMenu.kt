@@ -1,188 +1,239 @@
 package com.islavikfx.spoof.menus
+import android.annotation.SuppressLint
+import android.app.Dialog
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
+import android.widget.EditText
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.core.graphics.toColorInt
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.checkbox.MaterialCheckBox
+import com.google.android.material.card.MaterialCardView
 import com.islavikfx.spoof.R
-import com.islavikfx.spoof.AppActivity
-import com.islavikfx.spoof.utils.RootUtils
-import com.islavikfx.spoof.utils.SsaidProto
+import com.islavikfx.spoof.utils.*
 import com.topjohnwu.superuser.Shell
-import kotlin.random.Random
 
 
 class AndroidIdMenu : BaseMenu() {
+
     private val handler = Handler(Looper.getMainLooper())
-    private lateinit var rebootCheckbox: MaterialCheckBox
-    private lateinit var comCheckbox: MaterialCheckBox
-    private lateinit var setCheckbox: MaterialCheckBox
-    private lateinit var comTextView: TextView
-    private lateinit var setTextView: TextView
-    private lateinit var goButton: MaterialButton
-    private val ssaidPath = "/data/system/users/0/settings_ssaid.xml"
-    private val fallbackPath = "/data/system/users/0/settings_ssaid.xml.fallback"
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var searchEdit: EditText
+    private lateinit var adapter: SsidAdapter
+    private lateinit var loadingText: TextView
+    private lateinit var loadingProgress: ProgressBar
+    private val allItems = mutableListOf<SsidProto.PackageSsid>()
+    private val filteredItems = mutableListOf<SsidProto.PackageSsid>()
+    private var isLoading = false
+    private var searchText = ""
+    private val searchHandler = Handler(Looper.getMainLooper())
+    private val ssidFilePath = "/data/system/users/0/settings_ssaid.xml"
 
     override fun draw(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View {
-        return inflater.inflate(R.layout.menu_aid, container, false) }
-
-    override fun setup(view: View, state: Bundle?) { setupBackButton(view)
-        setupTitle(view)
-        initializeViews(view)
-        setupCheckboxes()
-        setupGoButton()
-        applyTheme()
-        loadCurrentIds() }
-
-    private fun setupBackButton(view: View) {
-        view.findViewById<ImageView>(R.id.btn_back).setOnClickListener {
-            parentFragmentManager.popBackStack() }
+        return inflater.inflate(R.layout.menu_aid, container, false)
     }
 
-    private fun setupTitle(view: View) {
-        view.findViewById<TextView>(R.id.bar_title).text = title() }
+    override fun setup(view: View, state: Bundle?) {
+        if (!isRootAvailable()) {
+            parentFragmentManager.popBackStack()
+            return
+        }
 
-    private fun initializeViews(view: View) {
-        rebootCheckbox = view.findViewById(R.id.chk_reboot)
-        comCheckbox = view.findViewById(R.id.chk_com)
-        setCheckbox = view.findViewById(R.id.chk_set)
-        comTextView = view.findViewById(R.id.txt_com)
-        setTextView = view.findViewById(R.id.txt_set)
-        goButton = view.findViewById(R.id.btn_go) }
+        view.findViewById<ImageView>(R.id.btn_back).setOnClickListener { parentFragmentManager.popBackStack() }
+        view.findViewById<TextView>(R.id.bar_title).text = title()
+        recyclerView = view.findViewById(R.id.rec)
+        searchEdit = view.findViewById(R.id.search)
+        loadingText = view.findViewById(R.id.loading_txt)
+        loadingProgress = view.findViewById(R.id.loading_progress)
+        recyclerView.layoutManager = LinearLayoutManager(requireContext())
+        adapter = SsidAdapter(filteredItems, { item -> showEditDialog(item) }, getThemeColor())
+        recyclerView.adapter = adapter
 
-    private fun setupCheckboxes() {
-        rebootCheckbox.isChecked = true
-        comCheckbox.isChecked = true
-        setCheckbox.isChecked = true }
+        searchEdit.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (isLoading) return
+                searchText = s?.toString()?.lowercase() ?: ""
+                searchHandler.removeCallbacksAndMessages(null)
+                searchHandler.postDelayed({
+                    if (!isLoading && searchText == (searchEdit.text.toString().lowercase())) {
+                        filterItems(searchText) }
+                }, 300) }
+            override fun afterTextChanged(s: Editable?) {}
+        })
 
-    private fun setupGoButton() {
-        goButton.setOnClickListener {
-            if (isRootAccessAvailable()) execute() }
+        val searchCard: MaterialCardView = searchEdit.parent as MaterialCardView
+        searchCard.strokeColor = getThemeColor().toColorInt()
+        loadItems()
     }
 
-    private fun applyTheme() {
-        val color = getCurrentThemeColor().toColorInt()
-        goButton.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
-        val stateList = android.content.res.ColorStateList(
-            arrayOf(intArrayOf(-android.R.attr.state_checked),
-                intArrayOf(android.R.attr.state_checked)),
-            intArrayOf(0xFF757575.toInt(), color))
-        rebootCheckbox.buttonTintList = stateList
-        comCheckbox.buttonTintList = stateList
-        setCheckbox.buttonTintList = stateList
-    }
-
-    private fun loadCurrentIds() {
+    private fun loadItems() {
+        isLoading = true
+        loadingText.visibility = View.VISIBLE
+        loadingProgress.visibility = View.VISIBLE
+        recyclerView.visibility = View.GONE
+        searchEdit.isEnabled = false
         Thread {
             try {
-                val comId = getComAndroidId()
-                val settingsId = getSettingsAndroidId()
-                handler.post {
-                    comTextView.text = getString(R.string.current_id_com_android, comId)
-                    setTextView.text = getString(R.string.current_id_settings, settingsId)
-                }
-            } catch (@Suppress("UNUSED_PARAMETER") _: Exception) {
-                handler.post {
-                    comTextView.text = getString(R.string.current_id_com_android, getString(R.string.error))
-                    setTextView.text = getString(R.string.current_id_settings, getString(R.string.error)) } }
+                val items = if (RootUtils.fileExists(ssidFilePath)) {
+                    SsidProto.parseFile(ssidFilePath)
+                } else { emptyList() }
+                allItems.clear()
+                allItems.addAll(items.sortedBy { it.packageName })
+                handler.post { isLoading = false
+                    searchEdit.isEnabled = true
+                    loadingText.visibility = View.GONE
+                    loadingProgress.visibility = View.GONE
+                    recyclerView.visibility = View.VISIBLE
+                    filterItems(searchText)
+                    showToast("[+] Loaded (${allItems.size}) apps.") }
+            } catch (_: Exception) {
+                handler.post { isLoading = false
+                    searchEdit.isEnabled = true
+                    loadingText.visibility = View.GONE
+                    loadingProgress.visibility = View.GONE
+                    recyclerView.visibility = View.VISIBLE
+                    showToast(getString(R.string.error_loading)) }
+            }
         }.start()
     }
 
-    private fun getComAndroidId(): String {
-        return try {
-            if (!RootUtils.fileExists(ssaidPath)) return getString(R.string.not_found)
-            val result = Shell.cmd("cat $ssaidPath | base64").exec()
-            if (!result.isSuccess || result.out.isEmpty()) return getString(R.string.error)
-            val decodedBytes = android.util.Base64.decode(result.out.joinToString(""), android.util.Base64.DEFAULT)
-            val androidId = SsaidProto.findAndroidId(decodedBytes)
-            androidId.ifEmpty { getString(R.string.not_found) }
-        } catch (@Suppress("UNUSED_PARAMETER") _: Exception) {
-            getString(R.string.error) }
-    }
-
-    private fun getSettingsAndroidId(): String {
-        return try {
-            val result = Shell.cmd("settings get secure android_id").exec()
-            if (result.isSuccess && result.out.isNotEmpty() && result.out[0] != "null") {
-                result.out[0].trim()
+    @SuppressLint("NotifyDataSetChanged")
+    private fun filterItems(query: String) {
+        if (isLoading) return
+        try {
+            filteredItems.clear()
+            if (query.isEmpty()) {
+                filteredItems.addAll(allItems)
             } else {
-                getString(R.string.not_found)
-            }
-        } catch (@Suppress("UNUSED_PARAMETER") _: Exception) {
-            getString(R.string.error) }
+                val lowerQuery = query.lowercase()
+                filteredItems.addAll(
+                    allItems.filter { it.packageName.lowercase().contains(lowerQuery) || it.ssid.lowercase().contains(lowerQuery)
+                    }) }
+            adapter.notifyDataSetChanged()
+        } catch (_: Exception) { }
     }
 
-    private fun execute() {
+    @SuppressLint("InflateParams")
+    private fun showEditDialog(item: SsidProto.PackageSsid) {
+        val dialog = Dialog(requireContext(), R.style.RoundedDialog)
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dlg_ssid_edit, null, false)
+        dialog.setContentView(dialogView)
+        dialog.setCancelable(true)
+
+        val color = getThemeColor().toColorInt()
+        val editText: EditText = dialogView.findViewById(R.id.edit_val)
+        val selectedTxt: TextView = dialogView.findViewById(R.id.txt_sel)
+        val currentTxt: TextView = dialogView.findViewById(R.id.txt_cur)
+        val cancelBtn: MaterialButton = dialogView.findViewById(R.id.btn_cancel)
+        val applyBtn: MaterialButton = dialogView.findViewById(R.id.btn_apply)
+        val applyRebootBtn: MaterialButton = dialogView.findViewById(R.id.btn_apply_reboot)
+        val isAndroidPackage = item.packageName == "android"
+        val newRandomId = SsidProto.generateRandomId(isAndroidPackage)
+
+        selectedTxt.text = getString(R.string.selected_show, item.packageName)
+        currentTxt.text = getString(R.string.current_ssaid, item.ssid)
+        editText.hint = getString(R.string.type_here)
+        editText.setText(newRandomId)
+        editText.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
+
+        val editCard: MaterialCardView = editText.parent as MaterialCardView
+        editCard.strokeColor = color
+        cancelBtn.setOnClickListener { dialog.dismiss() }
+        cancelBtn.strokeColor = android.content.res.ColorStateList.valueOf(color)
+        applyBtn.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
+        applyBtn.setOnClickListener {
+            val newValue = editText.text.toString().trim()
+            if (newValue.isNotEmpty() && newValue != item.ssid) {
+                updateItem(item.packageName, newValue, false)
+                dialog.dismiss()
+            }
+        }
+
+        applyRebootBtn.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
+        applyRebootBtn.setOnClickListener {
+            val newValue = editText.text.toString().trim()
+            if (newValue.isNotEmpty() && newValue != item.ssid) {
+                updateItem(item.packageName, newValue, true)
+                dialog.dismiss()
+            }
+        }
+
+        dialog.show()
+        dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.9).toInt(), WindowManager.LayoutParams.WRAP_CONTENT)
+    }
+
+    private fun updateItem(packageName: String, newValue: String, shouldReboot: Boolean) {
         Thread {
             try {
-                var newComId = ""
-                var newSettingsId = ""
-
-                if (comCheckbox.isChecked && RootUtils.fileExists(ssaidPath)) {
-                    newComId = updateComAndroidId() }
-                if (setCheckbox.isChecked) {
-                    newSettingsId = updateSettingsAndroidId() }
-                updateUIAfterUpdate(newComId, newSettingsId)
-
-                if (rebootCheckbox.isChecked) {
-                    scheduleReboot() }
-            } catch (@Suppress("UNUSED_PARAMETER") _: Exception) {
-            }
+                val success = SsidProto.updateFile(ssidFilePath, packageName, newValue)
+                if (success) {
+                    Shell.cmd("am force-stop $packageName 2>/dev/null").exec() }
+                handler.post {
+                    if (success) {
+                        if (shouldReboot) {
+                            showToast(getString(R.string.rebooting))
+                            handler.postDelayed({ Shell.cmd("reboot").submit() }, 1000)
+                        } else { showToast(getString(R.string.ssaid_updated))
+                        }
+                    } else { showToast(getString(R.string.update_fail)) }
+                    loadItems()
+                }
+            } catch (_: Exception) {
+                handler.post {
+                    showToast(getString(R.string.update_fail)) } }
         }.start()
     }
 
-    private fun updateComAndroidId(): String {
-        val result = Shell.cmd("cat $ssaidPath | base64").exec()
-        if (!result.isSuccess || result.out.isEmpty()) return ""
+    override fun title(): String = getString(R.string.android_id_settings)
+}
 
-        var decodedBytes = android.util.Base64.decode(result.out.joinToString(""), android.util.Base64.DEFAULT)
-        val newId = generateRandomHex(64).uppercase()
-        decodedBytes = SsaidProto.replaceAndroidId(decodedBytes, newId)
-        val encodedBytes = android.util.Base64.encodeToString(decodedBytes, android.util.Base64.DEFAULT)
-        Shell.cmd("echo '$encodedBytes' | base64 -d > $ssaidPath").exec()
-        Shell.cmd("cp $ssaidPath $fallbackPath").exec()
-        Shell.cmd("chmod 660 $ssaidPath").exec()
-        Shell.cmd("chmod 660 $fallbackPath").exec()
 
-        return newId
+class SsidAdapter(private val items: List<SsidProto.PackageSsid>,
+    private val onEdit: (SsidProto.PackageSsid) -> Unit,
+    private val themeColor: String) : RecyclerView.Adapter<SsidAdapter.ViewHolder>() {
+
+    class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val icon: ImageView = view.findViewById(R.id.app_icon)
+        val label: TextView = view.findViewById(R.id.app_label)
+        val pkg: TextView = view.findViewById(R.id.app_pkg)
+        val editBtn: TextView = view.findViewById(R.id.btn_edit)
+        val card: MaterialCardView = view.findViewById(R.id.edit_ctr)
     }
 
-    private fun updateSettingsAndroidId(): String {
-        val newId = generateRandomHex(16).lowercase()
-        Shell.cmd("settings put secure android_id $newId").exec()
-        return newId }
-
-    private fun updateUIAfterUpdate(newComId: String, newSettingsId: String) {
-        handler.post {
-            if (newComId.isNotEmpty()) {
-                comTextView.text = getString(R.string.current_id_com_android, newComId)
-            }
-            if (newSettingsId.isNotEmpty()) {
-                setTextView.text = getString(R.string.current_id_settings, newSettingsId)
-            }
-            toast(getString(R.string.android_id_updated)) }
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_app, parent, false)
+        return ViewHolder(view)
     }
 
-    private fun scheduleReboot() {
-        handler.post { toast(getString(R.string.rebooting)) }
-        handler.postDelayed({ Shell.cmd("reboot").submit() }, 1000)
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        val item = items[position]
+        try {
+            val drawable = holder.icon.context.packageManager.getApplicationIcon(item.packageName)
+            holder.icon.setImageDrawable(drawable)
+        } catch (_: PackageManager.NameNotFoundException) {
+            holder.icon.setImageResource(android.R.drawable.sym_def_app_icon)
+        }
+        holder.label.text = item.packageName.split('.').last().replaceFirstChar { it.uppercase() }
+        holder.pkg.text = item.packageName
+        val color = themeColor.toColorInt()
+        holder.card.strokeColor = color
+        holder.card.strokeWidth = 2
+        holder.editBtn.setTextColor(color)
+        holder.editBtn.setOnClickListener { onEdit(item) }
     }
 
-    private fun generateRandomHex(length: Int): String {
-        return (1..length).map { "0123456789ABCDEF"[Random.nextInt(16)] }.joinToString("") }
-
-    private fun isRootAccessAvailable(): Boolean {
-        return (activity as? AppActivity)?.isRt() ?: false }
-
-    private fun getCurrentThemeColor(): String {
-        return (activity as? AppActivity)?.getCol() ?: "#9C27B0" }
-
-    override fun title(): String = getString(R.string.reset_android_id)
-
+    override fun getItemCount(): Int = items.size
 }

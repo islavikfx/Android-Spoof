@@ -12,7 +12,6 @@ import android.widget.TextView
 import androidx.core.graphics.toColorInt
 import com.google.android.material.button.MaterialButton
 import com.islavikfx.spoof.R
-import com.islavikfx.spoof.AppActivity
 import com.topjohnwu.superuser.Shell
 
 
@@ -28,19 +27,21 @@ class SettingsMenu : BaseMenu() {
         R.id.t_orange to "#FF9800",
         R.id.t_teal to "#009688")
 
+
     override fun draw(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View =
         inflater.inflate(R.layout.menu_settings, container, false)
 
     override fun setup(view: View, state: Bundle?) {
         setupBackButton(view)
         setupTitle(view)
-        setupThemes(view)
+        setupThemeSelector(view)
         setupClearButton(view)
         setupRebootButton(view) }
 
     private fun setupBackButton(view: View) {
         view.findViewById<ImageView>(R.id.btn_back).setOnClickListener {
-            parentFragmentManager.popBackStack() }
+            parentFragmentManager.popBackStack()
+        }
     }
 
     private fun setupTitle(view: View) {
@@ -49,19 +50,28 @@ class SettingsMenu : BaseMenu() {
 
     private fun setupClearButton(view: View) {
         view.findViewById<MaterialButton>(R.id.btn_clear).setOnClickListener {
-            if (!isRtAvailable()) return@setOnClickListener
-            toast(getString(R.string.working))
-            handler.postDelayed({ clearCache() }, 1000) }
+            if (!hasRootAccess()) {
+                showToast(getString(R.string.no_root_access))
+                return@setOnClickListener
+            } else {
+                showToast(getString(R.string.working))
+                handler.postDelayed({ clearSystemCache() }, 1000)
+            }
+        }
     }
 
     private fun setupRebootButton(view: View) {
         view.findViewById<MaterialButton>(R.id.btn_reboot).setOnClickListener {
-            if (!isRtAvailable()) return@setOnClickListener
-            toast(getString(R.string.rebooting))
-            handler.postDelayed({ rebootDevice() }, 1500) }
+            if (!hasRootAccess()) {
+                showToast(getString(R.string.no_root_access))
+                return@setOnClickListener
+            }
+            showToast(getString(R.string.rebooting))
+            handler.postDelayed({ rebootDevice() }, 1500)
+        }
     }
 
-    private fun setupThemes(view: View) {
+    private fun setupThemeSelector(view: View) {
         val currentColor = getCurrentThemeColor()
         themeColors.forEach { (id, color) ->
             val themeView = view.findViewById<View>(id)
@@ -70,8 +80,7 @@ class SettingsMenu : BaseMenu() {
                 highlightSelectedTheme(view, color) }
             themeView?.isClickable = true
             themeView?.isFocusable = true
-            themeView?.background = null
-        }
+            themeView?.background = null }
         highlightSelectedTheme(view, currentColor)
     }
 
@@ -91,35 +100,33 @@ class SettingsMenu : BaseMenu() {
             if (isSelected) {
                 setStroke(4, Color.WHITE)
             } else {
-                setStroke(2, "#444444".toColorInt()) }
+                setStroke(2, "#444444".toColorInt())
+            }
         }
     }
 
     private fun updateButtonColors(view: View, color: String) {
         val colorState = android.content.res.ColorStateList.valueOf(color.toColorInt())
         view.findViewById<MaterialButton>(R.id.btn_clear)?.strokeColor = colorState
-        view.findViewById<MaterialButton>(R.id.btn_reboot)?.strokeColor = colorState }
-
-    private fun updateThemeColor(color: String) {
-        (activity as? AppActivity)?.setCol(color) }
-
-    private fun getCurrentThemeColor(): String {
-        return (activity as? AppActivity)?.getCol() ?: "#9C27B0" }
-
-    private fun isRtAvailable(): Boolean {
-        return (activity as? AppActivity)?.isRt() ?: false }
-
-    private fun clearCache() {
-        Thread { Shell.cmd(
-            "rm -rf /data/cache/*",
-            "rm -rf /data/dalvik-cache/*",
-            "rm -rf /data/log/*",
-            "reboot").submit() }.start()
+        view.findViewById<MaterialButton>(R.id.btn_reboot)?.strokeColor = colorState
     }
 
+
+    private fun updateThemeColor(color: String) {
+        activity.setThemeColor(color) }
+    private fun getCurrentThemeColor(): String {
+        return activity.getThemeColor() }
+    private fun hasRootAccess(): Boolean {
+        return activity.hasRoot() }
+
+
+    private fun clearSystemCache() {
+        Thread { Shell.cmd("rm -rf /data/cache/*", "rm -rf /data/dalvik-cache/*", "rm -rf /data/log/*", "reboot").submit()
+        }.start()
+    }
     private fun rebootDevice() {
-        Shell.cmd("reboot").submit() }
+        Shell.cmd("reboot").submit()
+    }
 
     override fun title(): String = getString(R.string.settings_title)
-
 }

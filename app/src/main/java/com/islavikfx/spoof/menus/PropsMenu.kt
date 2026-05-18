@@ -20,7 +20,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.islavikfx.spoof.R
-import com.topjohnwu.superuser.Shell
+import com.topjohnwu.superuser.Shell.cmd
 
 
 class PropsMenu : BaseMenu() {
@@ -31,75 +31,187 @@ class PropsMenu : BaseMenu() {
     private lateinit var adapter: PropsAdapter
     private val allItems = mutableListOf<PropItem>()
     private val filteredItems = mutableListOf<PropItem>()
-    private val moduleDir = "/data/adb/modules/android_spoof_magisk"
-    private var warned = false
+    private val moduleDir = "/data/adb/modules/AndroidSpoofApp"
+    private var warningShown = false
     private var searchText = ""
     private val searchHandler = Handler(Looper.getMainLooper())
 
+    
     override fun draw(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View {
-        return inflater.inflate(R.layout.menu_props, container, false) }
+        return inflater.inflate(R.layout.menu_props, container, false)
+    }
 
+    
     override fun setup(view: View, state: Bundle?) {
         if (!isRootAvailable()) {
             parentFragmentManager.popBackStack()
-            return }
+            return
+        }
 
-        view.findViewById<ImageView>(R.id.btn_back).setOnClickListener {
-            parentFragmentManager.popBackStack() }
+        view.findViewById<ImageView>(R.id.btn_back).setOnClickListener { parentFragmentManager.popBackStack() }
         view.findViewById<TextView>(R.id.bar_title).text = title()
-
         recyclerView = view.findViewById(R.id.rec)
         searchView = view.findViewById(R.id.search)
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         adapter = PropsAdapter(filteredItems, { item -> showEditDialog(item) }, getThemeColor())
         recyclerView.adapter = adapter
-
+        
         searchView.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 searchText = s?.toString()?.lowercase() ?: ""
                 searchHandler.removeCallbacksAndMessages(null)
                 searchHandler.postDelayed({
-                    if (searchText == (searchView.text.toString().lowercase())) {
+                    if (searchText == searchView.text.toString().lowercase()) {
                         filterList(searchText)
-                    }
-                }, 300)
+                    }}, 300)
             }
-            override fun afterTextChanged(s: Editable?) {} })
 
-        (searchView.parent as? MaterialCardView)?.strokeColor = getThemeColor().toColorInt()
+            override fun afterTextChanged(s: Editable?) {}
+        })
+        
+        val searchCard: MaterialCardView = searchView.parent as MaterialCardView
+        searchCard.strokeColor = getThemeColor().toColorInt()
         searchView.visibility = View.GONE
-
-        if (!warned) {
-            showWarning()
+        if (!warningShown) {
+            showWarningDialog()
         } else {
             searchView.visibility = View.VISIBLE
-            loadData()
+            loadPropsData()
         }
     }
 
-    private fun showWarning() {
+    
+    @SuppressLint("InflateParams")
+    private fun showWarningDialog() {
         val dialog = Dialog(requireContext(), R.style.RoundedDialog)
-        val rootView = dialog.window?.decorView?.findViewById<ViewGroup>(android.R.id.content)
-        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dlg_warn, rootView, false)
+        val dialogView = LayoutInflater.from(requireContext())
+            .inflate(R.layout.dlg_warn, null, false)
         dialog.setContentView(dialogView)
         dialog.setCancelable(false)
 
-        val okBtn = dialogView.findViewById<MaterialButton>(R.id.btn_ok)
-        okBtn.backgroundTintList = android.content.res.ColorStateList.valueOf(getThemeColor().toColorInt())
-        okBtn.setOnClickListener { dialog.dismiss()
-            warned = true
+        val okButton: MaterialButton = dialogView.findViewById(R.id.btn_ok)
+        okButton.backgroundTintList = android.content.res.ColorStateList.valueOf(getThemeColor().toColorInt())
+        okButton.setOnClickListener { dialog.dismiss()
+            warningShown = true
             searchView.visibility = View.VISIBLE
-            loadData() }
-
+            ensureModuleExists()
+            loadPropsData() }
         dialog.show()
-        dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.9).toInt(),
-            WindowManager.LayoutParams.WRAP_CONTENT) }
+        dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.9).toInt(), WindowManager.LayoutParams.WRAP_CONTENT)
+    }
 
-    private fun loadData() {
+    
+    private fun ensureModuleExists() {
+        Thread {
+            try { val modulePropExists = cmd("test -f $moduleDir/module.prop && echo 1 || echo 0").exec().out.firstOrNull() == "1"
+                if (modulePropExists) return@Thread
+                cmd("mkdir -p $moduleDir").exec()
+                createCustomPropFile()
+                createSePolicyRule()
+                createPostFsDataScript()
+                createServiceScript()
+                createModuleProp()
+                createSystemProp()
+            } catch (_: Exception) {
+            }
+        }.start()
+    }
+
+    
+    private fun createCustomPropFile() {
+        val content = """ro.boot.verifiedbootstate=green
+ro.boot.flash.locked=1
+ro.boot.warranty_bit=0"""
+        cmd("echo '$content' > $moduleDir/custom.prop").exec()
+        cmd("chmod 644 $moduleDir/custom.prop").exec()
+    }
+
+    
+    private fun createSePolicyRule() {
+        val content = """allow init self:capability sys_admin
+allow init kernel system syslog_read
+allow init self:property_service property_set
+allow init system_file file execmod
+allow { init -shell } property_type property_service set"""
+        cmd("echo '$content' > $moduleDir/sepolicy.rule").exec()
+        cmd("chmod 644 $moduleDir/sepolicy.rule").exec()
+    }
+
+    
+    private fun createPostFsDataScript() {
+        val content = $$"""#!/system/bin/sh
+dir=${0%/*}
+
+if [ -f "$""" + """dir/custom.prop" ]; then
+    while IFS='=' read -r name value; do
+        case "$""" + """name" in
+            ""|\#*) continue ;;
+            *) resetprop -n "$""" + """name" "$""" + """value" ;;
+        esac
+    done < "$""" + """dir/custom.prop"
+fi
+
+resetprop -n ro.boot.verifiedbootstate green
+resetprop -n ro.boot.flash.locked 1
+resetprop -n ro.boot.warranty_bit 0
+
+exit 0"""
+        cmd("echo '$content' > $moduleDir/post-fs-data.sh").exec()
+        cmd("chmod 755 $moduleDir/post-fs-data.sh").exec()
+    }
+
+
+    private fun createServiceScript() {
+        val content = """#!/system/bin/sh
+dir=$""" + """{'$'}{0%/*}
+
+until [ "$(getprop sys.boot_completed)" = "1" ]; do
+    sleep 1
+done
+
+sleep 2
+
+if [ -f "$""" + """dir/custom.prop" ]; then
+    while IFS='=' read -r name value; do
+        case "$""" + """name" in
+            ""|\#*) continue ;;
+            *) resetprop -n "$""" + """name" "$""" + """value" ;;
+        esac
+    done < "$""" + """dir/custom.prop"
+fi
+
+exit 0"""
+        cmd("echo '$content' > $moduleDir/service.sh").exec()
+        cmd("chmod 755 $moduleDir/service.sh").exec()
+    }
+
+
+    private fun createModuleProp() {
+        val content = """id=AndroidSpoofApp
+name=Android Spoof Props (App)
+version=1.1.0
+versionCode=110
+author=iSlavik (@islavikfx)
+description=Module generated automatically by Android Spoof App. This module working with Magisk Framework and set your custom props."""
+        cmd("echo '$content' > $moduleDir/module.prop").exec()
+        cmd("chmod 644 $moduleDir/module.prop").exec()
+    }
+
+
+    private fun createSystemProp() {
+        val content = """ro.boot.verifiedbootstate=green
+ro.boot.flash.locked=1
+ro.boot.warranty_bit=0"""
+        cmd("echo '$content' > $moduleDir/system.prop").exec()
+        cmd("chmod 644 $moduleDir/system.prop").exec()
+    }
+
+
+    private fun loadPropsData() {
         Thread {
             try {
-                val result = Shell.cmd("resetprop").exec()
+                val result = cmd("resetprop").exec()
                 if (result.isSuccess) {
                     allItems.clear()
                     for (line in result.out) {
@@ -117,11 +229,12 @@ class PropsMenu : BaseMenu() {
                 }
             } catch (_: Exception) {
                 handler.post {
-                    Toast.makeText(requireContext(), "Error loading props.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), getString(R.string.error_props), Toast.LENGTH_SHORT).show()
                 }
             }
         }.start()
     }
+
 
     @SuppressLint("NotifyDataSetChanged")
     private fun filterList(query: String) {
@@ -131,111 +244,138 @@ class PropsMenu : BaseMenu() {
                 filteredItems.addAll(allItems)
             } else {
                 val lowerQuery = query.lowercase()
-                filteredItems.addAll(allItems.filter {
-                    it.name.lowercase().contains(lowerQuery) ||
-                            it.value.lowercase().contains(lowerQuery)
-                })
+                filteredItems.addAll(
+                    allItems.filter {
+                        it.name.lowercase().contains(lowerQuery) ||
+                                it.value.lowercase().contains(lowerQuery)
+                    }
+                )
             }
             adapter.notifyDataSetChanged()
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (_: Exception) {
         }
     }
 
-    // Остальной код без изменений...
+
+    @SuppressLint("InflateParams")
     private fun showEditDialog(item: PropItem) {
         val dialog = Dialog(requireContext(), R.style.RoundedDialog)
-        val rootView = dialog.window?.decorView?.findViewById<ViewGroup>(android.R.id.content)
-        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dlg_edit, rootView, false)
+        val dialogView = LayoutInflater.from(requireContext())
+            .inflate(R.layout.dlg_edit, null, false)
 
         dialog.setContentView(dialogView)
         dialog.setCancelable(true)
-
         val color = getThemeColor().toColorInt()
-        val editText = dialogView.findViewById<EditText>(R.id.edit_val)
-        val selectedTxt = dialogView.findViewById<TextView>(R.id.txt_sel)
-        val currentTxt = dialogView.findViewById<TextView>(R.id.txt_cur)
-        val cancelBtn = dialogView.findViewById<MaterialButton>(R.id.btn_cancel)
-        val saveBtn = dialogView.findViewById<MaterialButton>(R.id.btn_save)
-
-        editText.hint = "Type here..."
+        val editText: EditText = dialogView.findViewById(R.id.edit_val)
+        val selectedTxt: TextView = dialogView.findViewById(R.id.txt_sel)
+        val currentTxt: TextView = dialogView.findViewById(R.id.txt_cur)
+        val cancelBtn: MaterialButton = dialogView.findViewById(R.id.btn_cancel)
+        val saveBtn: MaterialButton = dialogView.findViewById(R.id.btn_save)
+        editText.hint = getString(R.string.type_here)
         editText.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
-        selectedTxt.text = getString(R.string.selected_prop, item.name)
+        selectedTxt.text = getString(R.string.selected_show, item.name)
         currentTxt.text = getString(R.string.current_value, item.value)
+
         cancelBtn.setOnClickListener { dialog.dismiss() }
         saveBtn.setOnClickListener {
             val newVal = editText.text.toString()
             if (newVal.isNotEmpty()) {
                 saveProperty(item.name, newVal)
-                dialog.dismiss() }
+                dialog.dismiss()
+            }
         }
 
         saveBtn.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
         cancelBtn.strokeColor = android.content.res.ColorStateList.valueOf(color)
-        (editText.parent as? MaterialCardView)?.strokeColor = color
+        val editCard: MaterialCardView = editText.parent as MaterialCardView
+        editCard.strokeColor = color
 
         dialog.show()
-        dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.9).toInt(),
-            WindowManager.LayoutParams.WRAP_CONTENT) }
+        dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.9).toInt(), WindowManager.LayoutParams.WRAP_CONTENT)
+    }
 
     private fun saveProperty(name: String, value: String) {
         Thread {
             try {
-                if (isSafeProp(name)) {
-                    Shell.cmd("resetprop -n $name \"$value\"").exec()
-                    saveToBoot(name, value)
-                    handler.post {
-                        Toast.makeText(requireContext(), "Prop saved! Reboot to apply.", Toast.LENGTH_LONG).show()
-                        loadData()
+                if (!isSafeProp(name)) {
+                    handler.post {Toast.makeText(requireContext(), getString(R.string.error_props_critical), Toast.LENGTH_LONG).show()
                     }
+                return@Thread }
 
-                } else {
-                    handler.post {
-                        Toast.makeText(requireContext(), "Cannot edit critical prop.", Toast.LENGTH_LONG).show()
+                cmd("resetprop -n $name \"$value\"").exec()
+                val customPropFile = "$moduleDir/custom.prop"
+                val existing = mutableMapOf<String, String>()
+                val readResult = cmd("cat $customPropFile 2>/dev/null").exec()
+                if (readResult.isSuccess) {
+                    for (line in readResult.out) {
+                        if (line.contains("=") && !line.startsWith("#")) {
+                            val parts = line.split("=", limit = 2)
+                            if (parts.size == 2) {
+                                existing[parts[0]] = parts[1]
+                            }
+                        }
                     }
                 }
-            } catch (_: Exception) { }
+
+                existing[name] = value
+                val sb = StringBuilder()
+                for ((propName, propValue) in existing) {
+                    sb.append("$propName=$propValue\n")
+                }
+                cmd("echo '${sb.toString()}' > $customPropFile").exec()
+                cmd("chmod 644 $customPropFile").exec()
+                updateSystemProp(name, value)
+
+                handler.post {Toast.makeText(requireContext(), getString(R.string.prop_saved),Toast.LENGTH_LONG).show()
+                loadPropsData()
+                }
+
+            } catch (_: Exception) {
+                handler.post {Toast.makeText(requireContext(), getString(R.string.error), Toast.LENGTH_SHORT).show()}
+            }
         }.start()
     }
 
-    private fun saveToBoot(name: String, value: String) {
-        try {
-            Shell.cmd("mkdir -p $moduleDir").exec()
-            val script = "$moduleDir/service.sh"
-            val moduleProp = "$moduleDir/module.prop"
-            if (Shell.cmd("test -f $script && echo 1 || echo 0").exec().out.firstOrNull() == "0") {
-                Shell.cmd("echo '#!/system/bin/sh' > $script").exec()
-                Shell.cmd("echo '' >> $script").exec() }
-            if (Shell.cmd("grep -q 'resetprop -n $name ' $script && echo 1 || echo 0").exec().out.firstOrNull() == "1") {
-                Shell.cmd("sed -i 's|resetprop -n $name .*|resetprop -n $name \"$value\"|g' $script").exec()
+    private fun updateSystemProp(name: String, value: String) {
+        val sysPropFile = "$moduleDir/system.prop"
+        val existing = cmd("cat $sysPropFile 2>/dev/null").exec().out
+        val newLines = mutableListOf<String>()
+        var found = false
+
+        for (line in existing) {
+            if (line.startsWith("$name=")) {
+                newLines.add("$name=$value")
+                found = true
             } else {
-                Shell.cmd("echo '' >> $script").exec()
-                Shell.cmd("echo \"resetprop -n $name \\\"$value\\\"\" >> $script").exec() }
-            Shell.cmd("chmod 755 $script").exec()
-            if (Shell.cmd("test -f $moduleProp && echo 1 || echo 0").exec().out.firstOrNull() == "0") {
-                Shell.cmd("echo 'id=asp\nname=Props\nversion=1.0\nauthor=iSlavik' > $moduleProp").exec() }
-        } catch (_: Exception) { }
+                newLines.add(line)
+            }
+        }
+        if (!found) {
+            newLines.add("$name=$value")
+        }
+
+        val content = newLines.joinToString("\n")
+        cmd("echo '$content' > $sysPropFile").exec()
+        cmd("chmod 644 $sysPropFile").exec()
     }
 
     private fun isSafeProp(name: String): Boolean {
-        val critical = listOf("dalvik.vm", "dev.mnt", "init.svc", "mdc.sys", "persist.sys.", "ro.boot.",
-            "ro.hardware", "sys.boot", "vendor.ril.", "ril.", "ro.baseband", "boot.",
-            "ro.crypto.", "security.", "keystore.", "knox.", "persist.vendor.ims",
-            "vendor.wlan.", "vendor.bluetooth", "vendor.powerhal", "debug.sf.", "net.",
-            "persist.adb", "ro.adb.", "ro.debuggable", "selinux.", "drm.", "nfc.",
-            "ota.", "ro.bootloader", "factory", "pm.dexopt", "vold.", "persist.log.",
-            "ro.soc.", "ro.board.platform")
-        return !critical.any { name.startsWith(it) }
+        val critical = listOf("dalvik.vm", "dev.mnt", "init.svc", "mdc.sys", "ro.hardware", "sys.boot", "ro.baseband", "boot.", "ro.crypto.", "security.", "keystore.", "knox.",
+            "persist.", "vendor.wlan.", "vendor.bluetooth", "vendor.powerhal", "debug.sf.", "persist.adb", "ro.adb.", "ro.debuggable", "selinux.", "drm.",
+            "nfc.", "ota.", "ro.bootloader", "factory", "pm.dexopt", "vold.", "persist.log.", "ro.soc.", "ro.board.platform")
+
+        val safeBoot = listOf("ro.boot.verifiedbootstate","ro.boot.flash.locked", "ro.boot.warranty_bit", "ro.boot.vbmeta.device_state")
+
+        if (safeBoot.any { name.startsWith(it) }) return true
+        return !critical.any { name.contains(it, ignoreCase = true) }
     }
 
     override fun title(): String = getString(R.string.hide_props)
     data class PropItem(val name: String, val value: String)
-
 }
 
-class PropsAdapter(private val items: List<PropsMenu.PropItem>,
-                   private val onEdit: (PropsMenu.PropItem) -> Unit,
-                   private val theme: String) : RecyclerView.Adapter<PropsAdapter.ViewHolder>() {
+
+class PropsAdapter(private val items: List<PropsMenu.PropItem>, private val onEdit: (PropsMenu.PropItem) -> Unit, private val theme: String) : RecyclerView.Adapter<PropsAdapter.ViewHolder>() {
 
     class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
         val nameTxt: TextView = v.findViewById(R.id.prop_n)
@@ -244,13 +384,16 @@ class PropsAdapter(private val items: List<PropsMenu.PropItem>,
         val card: MaterialCardView = v.findViewById(R.id.edit_ctr)
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, type: Int): ViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_prop, parent, false)
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_prop, parent, false)
         return ViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: ViewHolder, pos: Int) {
-        val item = items[pos]
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        val item = items[position]
         holder.nameTxt.text = item.name
         holder.valueTxt.text = item.value
         val color = theme.toColorInt()
@@ -261,5 +404,4 @@ class PropsAdapter(private val items: List<PropsMenu.PropItem>,
     }
 
     override fun getItemCount(): Int = items.size
-
 }
