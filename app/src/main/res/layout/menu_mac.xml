@@ -22,7 +22,7 @@
             android:layout_height="48dp"
             android:src="@drawable/draw_forward"
             android:rotation="180"
-            android:padding="12dp"
+            android:padding="13dp"
             android:contentDescription="@string/desc_back"
             android:foreground="?attr/selectableItemBackgroundBorderless" />
         <TextView
@@ -37,7 +37,6 @@
             android:textStyle="bold"
             android:gravity="center" />
     </LinearLayout>
-
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -48,6 +47,40 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:paddingBottom="20dp">
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardBackgroundColor="#1A1A1A"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#333333"
+                app:strokeWidth="1dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="16dp">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/connection_status"
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:fontFamily="@font/poppins_light"/>
+                    <TextView
+                        android:id="@+id/txt_connection_status"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/checking"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="#FF9800" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -72,7 +105,6 @@
                         android:paddingStart="8dp"
                         android:paddingEnd="8dp" />
                 </LinearLayout>
-
             </com.google.android.material.card.MaterialCardView>
             <TextView
                 android:id="@+id/tv_warn"
