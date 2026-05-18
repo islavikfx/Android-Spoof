@@ -15,110 +15,109 @@ import androidx.core.net.toUri
 import androidx.fragment.app.Fragment
 import com.google.android.material.card.MaterialCardView
 import com.islavikfx.spoof.menus.*
-import com.islavikfx.spoof.utils.RootUtils
+import com.islavikfx.spoof.utils.*
 import com.topjohnwu.superuser.Shell
 
 
 class AppActivity : AppCompatActivity() {
-    private lateinit var prefs: SharedPreferences
-    private var cur = "#9C27B0"
-    private var rt = false
+
+    private lateinit var preferences: SharedPreferences
+    private var currentThemeColor = "#9C27B0"
+    private var hasRootAccess = false
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
         setContentView(R.layout.app_launch)
-        Shell.enableVerboseLogging = false
-        Shell.setDefaultBuilder(Shell.Builder.create()
+        try {
+            Shell.enableVerboseLogging = false
+            Shell.setDefaultBuilder(Shell.Builder.create()
                 .setFlags(Shell.FLAG_MOUNT_MASTER)
                 .setTimeout(10))
+        } catch (_: Exception) { }
         Handler(Looper.getMainLooper()).postDelayed({
+            RootUtils.init(this)
             setContentView(R.layout.app_main)
-            init() }, 300)
+            initializeApp()
+        }, 300)
     }
 
-    private fun init() {
-        prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-        cur = prefs.getString(KEY, DEF) ?: DEF
+    private fun initializeApp() {
+        preferences = getSharedPreferences(PREFS, MODE_PRIVATE)
+        currentThemeColor = preferences.getString(KEY, DEFAULT_COLOR) ?: DEFAULT_COLOR
         setSupportActionBar(findViewById(R.id.toolbar))
         supportActionBar?.setDisplayShowTitleEnabled(false)
-        chkRt()
+        checkRootAccess()
 
         findViewById<ImageView>(R.id.iv_set).setOnClickListener {
-            show(SettingsMenu()) }
-
+            openFragment(SettingsMenu()) }
         findViewById<TextView>(R.id.tv_gh).setOnClickListener {
             startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/islavikfx".toUri())) }
-
-        theme(cur)
+        applyTheme(currentThemeColor)
 
         findViewById<MaterialCardView>(R.id.btn_ad).setOnClickListener {
-            if (chkRt()) show(AdIdMenu()) }
-
+            if (checkRootAccess())
+                openFragment(AdIdMenu()) }
         findViewById<MaterialCardView>(R.id.btn_aid).setOnClickListener {
-            if (chkRt()) show(AndroidIdMenu()) }
-
+            if (checkRootAccess())
+                openFragment(AndroidIdMenu()) }
         findViewById<MaterialCardView>(R.id.btn_mac).setOnClickListener {
-            if (chkRt()) show(MacMenu()) }
-
+            if (checkRootAccess())
+                openFragment(MacMenu()) }
         findViewById<MaterialCardView>(R.id.btn_props).setOnClickListener {
-            if (chkRt()) show(PropsMenu()) }
-
+            if (checkRootAccess())
+                openFragment(PropsMenu()) }
         findViewById<MaterialCardView>(R.id.btn_apps).setOnClickListener {
-            if (chkRt()) show(AppsMenu()) }
-
-        findViewById<MaterialCardView>(R.id.btn_tor).setOnClickListener {
-            if (chkRt()) show(TorMenu()) }
+            if (checkRootAccess())
+                try {
+                    SELinuxBypass.executeWithBypass("cd /")
+                    SELinuxBypass.installPolicy()
+                } catch (_: Exception) { }
+                openFragment(AppsMenu()) }
     }
 
-    private fun show(f: Fragment) {
-        supportFragmentManager.beginTransaction().replace(android.R.id.content, f)
+    private fun openFragment(fragment: Fragment) {
+        supportFragmentManager.beginTransaction()
+            .replace(android.R.id.content, fragment)
             .addToBackStack(null)
             .commit() }
 
-    private fun chkRt(): Boolean {
-        rt = RootUtils.isRootAvailable()
-        return if (!rt) {
-            Toast.makeText(this, R.string.no_root_access, Toast.LENGTH_SHORT).show()
-            false } else {
-            true }
-    }
+    private fun checkRootAccess(): Boolean {
+        hasRootAccess = RootUtils.isRootAvailable()
+        if (!hasRootAccess) { Toast.makeText(this, R.string.no_root_access, Toast.LENGTH_SHORT).show() }
+        return hasRootAccess }
 
-    fun getCol(): String = cur
+    fun getThemeColor(): String = currentThemeColor
 
-    fun setCol(c: String) { cur = c
-        prefs.edit { putString(KEY, c) }
-        theme(c) }
+    fun setThemeColor(color: String) { currentThemeColor = color
+        preferences.edit { putString(KEY, color) }
+        applyTheme(color) }
 
-    private fun theme(c: String) {
-        val ci = c.toColorInt()
-        val buttons = listOf(findViewById(R.id.btn_ad),
+    private fun applyTheme(color: String) {
+        val colorInt = color.toColorInt()
+        val menuButtons = listOf(findViewById<MaterialCardView>(R.id.btn_ad),
             findViewById(R.id.btn_aid),
             findViewById(R.id.btn_mac),
             findViewById(R.id.btn_props),
-            findViewById(R.id.btn_apps),
-            findViewById<MaterialCardView>(R.id.btn_tor))
-        buttons.forEach { b ->
-            b.strokeColor = ci
-            val linear = b.getChildAt(0) as? LinearLayout
-            val arrow = linear?.getChildAt(2) as? ImageView
-            arrow?.setColorFilter(ci) }
+            findViewById(R.id.btn_apps))
+        menuButtons.forEach { button -> button.strokeColor = colorInt
+            val linearLayout = button.getChildAt(0) as? LinearLayout
+            val arrowIcon = linearLayout?.getChildAt(2) as? ImageView
+            arrowIcon?.setColorFilter(colorInt) }
     }
 
-    fun isRt(): Boolean = rt
+    fun hasRoot(): Boolean = hasRootAccess
 
     override fun onResume() {
         super.onResume()
-        if (::prefs.isInitialized) {
-            val sc = prefs.getString(KEY, DEF) ?: DEF
-            if (sc != cur) { cur = sc
-                theme(sc) }
-        }
+        if (::preferences.isInitialized) {
+            val savedColor = preferences.getString(KEY, DEFAULT_COLOR) ?: DEFAULT_COLOR
+            if (savedColor != currentThemeColor) { currentThemeColor = savedColor
+                applyTheme(savedColor) } }
     }
 
     companion object {
         const val PREFS = "app_settings"
         const val KEY = "theme_color"
-        const val DEF = "#9C27B0"
+        const val DEFAULT_COLOR = "#9C27B0"
     }
-
 }
