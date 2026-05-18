@@ -7,36 +7,38 @@ plugins {
 android {
     namespace = "com.islavikfx.spoof"
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1 }
+        version = release(37)
     }
-
     defaultConfig {
+        //noinspection EditedTargetSdkVersion
         applicationId = "com.islavikfx.spoof"
-        minSdk = 28
-        targetSdk = 36
-        versionCode = 100
-        versionName = "1.0.0"
+        minSdk = 29
+        targetSdk = 37
+        versionCode = 110
+        versionName = "1.1.0"
         androidResources {
-            localeFilters.add("en")
+            @Suppress("UnstableApiUsage")
+            this.localeFilters.add("en")
         }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
+        sourceSets {
+            packaging {
+            resources { excludes += "**/*.nim" }
+        }
+    }
         ndk {
             abiFilters.addAll(listOf("arm64-v8a"))
         }
     }
-
     buildTypes {
         release {
             isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro", "proguard-custom-rules.pro")
         }
     }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -45,7 +47,7 @@ android {
 
 
 dependencies {
-    implementation("com.github.topjohnwu.libsu:core:6.0.0")
+    implementation(dependencyNotation = "com.github.topjohnwu.libsu:core:6.0.0")
     implementation(libs.protobuf.javalite)
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.core.ktx)
@@ -54,6 +56,7 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.activity.ktx)
+    implementation(libs.androidx.recyclerview)
     testImplementation(libs.gson)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
