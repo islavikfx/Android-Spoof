@@ -41,6 +41,7 @@ class AppActivity : AppCompatActivity() {
         }, 300)
     }
 
+    
     private fun initializeApp() {
         preferences = getSharedPreferences(PREFS, MODE_PRIVATE)
         currentThemeColor = preferences.getString(KEY, DEFAULT_COLOR) ?: DEFAULT_COLOR
