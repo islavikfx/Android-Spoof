@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.AndroidSpoofBeta" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.AndroidSpoof" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryVariant">@color/colorPrimaryDark</item>
         <item name="colorOnPrimary">#000000</item>
@@ -11,5 +11,6 @@
         <item name="android:navigationBarColor">#000000</item>
         <item name="android:windowBackground">#000000</item>
         <item name="android:windowFullscreen">true</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
     </style>
 </resources>
