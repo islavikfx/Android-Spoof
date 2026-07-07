@@ -1,6 +1,6 @@
 # Android Spoof App
 
-#### This app works only on 64-bit rooted devices with Android 10 - 17+. It allows you to reset the Advertising ID / Android ID, hide device properties, and delete any device apps.
+#### This app works only with rooted devices and Android 10 - 17+. It allows you to reset the Advertising ID / Android ID, hide device properties, and delete any device apps.
 ![Preview](https://github.com/islavikfx/Android-Spoof/blob/main/img/preview1.png?raw=true)
 ![](https://github.com/islavikfx/Android-Spoof/blob/main/img/preview2.png?raw=true)
 
