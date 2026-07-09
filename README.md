@@ -23,4 +23,8 @@ If you want to see something new in the app or youve found a bug - open an issue
 
 Youtube video: https://youtu.be/G2obDRR4DaI
 
-t.me/islavikhome
+Channel: t.me/islavikhome
+
+Community: discord.gg/VTM7NK7wzp
+
+Telegram & Discord contact: @islavikfx
