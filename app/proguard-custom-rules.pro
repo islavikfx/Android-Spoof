@@ -4,7 +4,7 @@
 }
 
 
--keepclassmembers class com.islavikfx.spoof.utils.SelinuxBypass {
+-keepclassmembers class com.islavikfx.spoof.utils.SELinuxBypass {
     public *;
     private *;
 }
