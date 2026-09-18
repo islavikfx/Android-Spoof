@@ -13,9 +13,9 @@
 
 `+` **Hide MAC Address Menu** - Can randomize MAC address for Wi-Fi network (until reboot).
 
-`+` **Hide Device Props Menu** - Can set any device prop. For example if you have a Xiaomi 10 then but by set your props the system will see it as a Samsung S10.
+`+` **Hide Device Props Menu** - Can set any device prop. For example: if you have a Samsung S8 then by set some props all the system will see it as a Pixel 7a.
 
-`+` **Configure Device Apps** - Can delete any device apps (user / system / kernel) and erase all of its data.
+`+` **Configure Device Apps** - Can delete any device apps (user / system / kernel) and erase all of it data.
 
 `+` **Settings Menu** - Clear dalvik-cache, reboot, select app theme.
 
