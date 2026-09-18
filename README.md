@@ -7,18 +7,18 @@
 
 #### v1.2.0 (29 August 2026):
 
-`+` **Advertising ID Menu** - Can reset AD ID or clear all data of .gms / .gsf.
+`+` **Advertising ID Menu** - Can reset Ad ID or clear all data of Google services.
 
 `+` **Android ID Menu** - Can reset AID for any app you choose in list.
 
-`+` **Hide MAC Address Menu** - Can randomize MAC address for WLAN network (until reboot).
+`+` **Hide MAC Address Menu** - Can randomize MAC address for Wi-Fi network (until reboot).
 
-`+` **Hide Device Props Menu** - Can set any device prop. For example, you have a Xiaomi 10, but by setting your props the system will see it as a Samsung S10.
+`+` **Hide Device Props Menu** - Can set any device prop. For example if you have a Xiaomi 10 then but by set your props the system will see it as a Samsung S10.
 
-`+` **Configure Device Apps** - Can delete any device app (OS/system/kernel/external) and erase all of its data.
+`+` **Configure Device Apps** - Can delete any device apps (user / system / kernel) and erase all of its data.
 
-`+` **Settings Menu** - Clear davlik-cache, reboot, select app theme.
+`+` **Settings Menu** - Clear dalvik-cache, reboot, select app theme.
 
-If you want to see something new in the app or youve found a bug - open an issue on this GitHub page.
+If you want to see something new in the app or you've found a bug - open an issue on this GitHub page.
 
 Telegram & Discord: @jeddy01759
