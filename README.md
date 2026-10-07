@@ -21,4 +21,4 @@
 
 If you want to see something new in the app or you've found a bug - open an issue on this GitHub page.
 
-Telegram & Discord: @jeddy01759
+Telegram & Discord: @islavikfx
