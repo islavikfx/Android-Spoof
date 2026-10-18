@@ -31,17 +31,17 @@ class PropsMenu : BaseMenu() {
     private lateinit var adapter: PropsAdapter
     private val allItems = mutableListOf<PropItem>()
     private val filteredItems = mutableListOf<PropItem>()
-    private val moduleDir = "/data/adb/modules/AndroidSpoofApp"
+    private val moduleDir = "/data/adb/modules/AndroidSpoofProps"
     private var warningShown = false
     private var searchText = ""
     private val searchHandler = Handler(Looper.getMainLooper())
 
-    
+
     override fun draw(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View {
         return inflater.inflate(R.layout.menu_props, container, false)
     }
 
-    
+
     override fun setup(view: View, state: Bundle?) {
         if (!isRootAvailable()) {
             parentFragmentManager.popBackStack()
@@ -55,7 +55,7 @@ class PropsMenu : BaseMenu() {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         adapter = PropsAdapter(filteredItems, { item -> showEditDialog(item) }, getThemeColor())
         recyclerView.adapter = adapter
-        
+
         searchView.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
@@ -64,12 +64,11 @@ class PropsMenu : BaseMenu() {
                 searchHandler.postDelayed({
                     if (searchText == searchView.text.toString().lowercase()) {
                         filterList(searchText)
-                    }}, 300)
-            }
+                    }}, 300) }
 
             override fun afterTextChanged(s: Editable?) {}
         })
-        
+
         val searchCard: MaterialCardView = searchView.parent as MaterialCardView
         searchCard.strokeColor = getThemeColor().toColorInt()
         searchView.visibility = View.GONE
@@ -81,7 +80,7 @@ class PropsMenu : BaseMenu() {
         }
     }
 
-    
+
     @SuppressLint("InflateParams")
     private fun showWarningDialog() {
         val dialog = Dialog(requireContext(), R.style.RoundedDialog)
@@ -101,7 +100,7 @@ class PropsMenu : BaseMenu() {
         dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.9).toInt(), WindowManager.LayoutParams.WRAP_CONTENT)
     }
 
-    
+
     private fun ensureModuleExists() {
         Thread {
             try { val modulePropExists = cmd("test -f $moduleDir/module.prop && echo 1 || echo 0").exec().out.firstOrNull() == "1"
@@ -113,12 +112,10 @@ class PropsMenu : BaseMenu() {
                 createServiceScript()
                 createModuleProp()
                 createSystemProp()
-            } catch (_: Exception) {
-            }
+            } catch (_: Exception) { }
         }.start()
     }
 
-    
     private fun createCustomPropFile() {
         val content = """ro.boot.verifiedbootstate=green
 ro.boot.flash.locked=1
@@ -127,7 +124,7 @@ ro.boot.warranty_bit=0"""
         cmd("chmod 644 $moduleDir/custom.prop").exec()
     }
 
-    
+
     private fun createSePolicyRule() {
         val content = """allow init self:capability sys_admin
 allow init kernel system syslog_read
@@ -138,60 +135,60 @@ allow { init -shell } property_type property_service set"""
         cmd("chmod 644 $moduleDir/sepolicy.rule").exec()
     }
 
-    
+
     private fun createPostFsDataScript() {
-        val content = $$"""#!/system/bin/sh
-dir=${0%/*}
-
-if [ -f "$""" + """dir/custom.prop" ]; then
-    while IFS='=' read -r name value; do
-        case "$""" + """name" in
-            ""|\#*) continue ;;
-            *) resetprop -n "$""" + """name" "$""" + """value" ;;
-        esac
-    done < "$""" + """dir/custom.prop"
-fi
-
-resetprop -n ro.boot.verifiedbootstate green
-resetprop -n ro.boot.flash.locked 1
-resetprop -n ro.boot.warranty_bit 0
-
-exit 0"""
+        val content = listOf("#!/system/bin/sh",
+            "dir=\${0%/*}",
+            "",
+            "if [ -f \"\$dir/custom.prop\" ]; then",
+            "    while IFS='=' read -r name value; do",
+            "        case \"\$name\" in",
+            "            \"\"|\\#*) continue ;;",
+            "            *) resetprop -n \"\$name\" \"\$value\" ;;",
+            "        esac",
+            "    done < \"\$dir/custom.prop\"",
+            "fi",
+            "",
+            "resetprop -n ro.boot.verifiedbootstate green",
+            "resetprop -n ro.boot.flash.locked 1",
+            "resetprop -n ro.boot.warranty_bit 0",
+            "",
+            "exit 0").joinToString("\n")
         cmd("echo '$content' > $moduleDir/post-fs-data.sh").exec()
         cmd("chmod 755 $moduleDir/post-fs-data.sh").exec()
     }
 
 
     private fun createServiceScript() {
-        val content = """#!/system/bin/sh
-dir=$""" + """{'$'}{0%/*}
-
-until [ "$(getprop sys.boot_completed)" = "1" ]; do
-    sleep 1
-done
-
-sleep 2
-
-if [ -f "$""" + """dir/custom.prop" ]; then
-    while IFS='=' read -r name value; do
-        case "$""" + """name" in
-            ""|\#*) continue ;;
-            *) resetprop -n "$""" + """name" "$""" + """value" ;;
-        esac
-    done < "$""" + """dir/custom.prop"
-fi
-
-exit 0"""
+        val content = listOf("#!/system/bin/sh",
+            "dir=\${0%/*}",
+            "",
+            "until [ \"\$(getprop sys.boot_completed)\" = \"1\" ]; do",
+            "    sleep 1",
+            "done",
+            "",
+            "sleep 2",
+            "",
+            "if [ -f \"\$dir/custom.prop\" ]; then",
+            "    while IFS='=' read -r name value; do",
+            "        case \"\$name\" in",
+            "            \"\"|\\#*) continue ;;",
+            "            *) resetprop -n \"\$name\" \"\$value\" ;;",
+            "        esac",
+            "    done < \"\$dir/custom.prop\"",
+            "fi",
+            "",
+            "exit 0").joinToString("\n")
         cmd("echo '$content' > $moduleDir/service.sh").exec()
         cmd("chmod 755 $moduleDir/service.sh").exec()
     }
 
 
     private fun createModuleProp() {
-        val content = """id=AndroidSpoofApp
+        val content = """id=AndroidSpoofProps
 name=Android Spoof Props (App)
-version=v1.2.0
-versionCode=120
+version=v1.3.0
+versionCode=130
 author=iSlavik (@islavikfx)
 description=Module generated automatically by Android Spoof App. This module working with Magisk Framework and set your custom props."""
         cmd("echo '$content' > $moduleDir/module.prop").exec()
@@ -235,7 +232,6 @@ ro.boot.warranty_bit=0"""
         }.start()
     }
 
-
     @SuppressLint("NotifyDataSetChanged")
     private fun filterList(query: String) {
         try {
@@ -245,23 +241,17 @@ ro.boot.warranty_bit=0"""
             } else {
                 val lowerQuery = query.lowercase()
                 filteredItems.addAll(
-                    allItems.filter {
-                        it.name.lowercase().contains(lowerQuery) ||
-                                it.value.lowercase().contains(lowerQuery)
-                    }
-                )
+                    allItems.filter { it.name.lowercase().contains(lowerQuery) || it.value.lowercase().contains(lowerQuery) })
             }
             adapter.notifyDataSetChanged()
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) { }
     }
 
 
     @SuppressLint("InflateParams")
     private fun showEditDialog(item: PropItem) {
         val dialog = Dialog(requireContext(), R.style.RoundedDialog)
-        val dialogView = LayoutInflater.from(requireContext())
-            .inflate(R.layout.dlg_edit, null, false)
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dlg_edit, null, false)
 
         dialog.setContentView(dialogView)
         dialog.setCancelable(true)
@@ -298,9 +288,8 @@ ro.boot.warranty_bit=0"""
         Thread {
             try {
                 if (!isSafeProp(name)) {
-                    handler.post {Toast.makeText(requireContext(), getString(R.string.error_props_critical), Toast.LENGTH_LONG).show()
-                    }
-                return@Thread }
+                    handler.post {Toast.makeText(requireContext(), getString(R.string.error_props_critical), Toast.LENGTH_LONG).show() }
+                    return@Thread }
 
                 cmd("resetprop -n $name \"$value\"").exec()
                 val customPropFile = "$moduleDir/custom.prop"
@@ -310,24 +299,20 @@ ro.boot.warranty_bit=0"""
                     for (line in readResult.out) {
                         if (line.contains("=") && !line.startsWith("#")) {
                             val parts = line.split("=", limit = 2)
-                            if (parts.size == 2) {
-                                existing[parts[0]] = parts[1]
-                            }
+                            if (parts.size == 2) { existing[parts[0]] = parts[1] }
                         }
                     }
                 }
 
                 existing[name] = value
                 val sb = StringBuilder()
-                for ((propName, propValue) in existing) {
-                    sb.append("$propName=$propValue\n")
-                }
+                for ((propName, propValue) in existing) { sb.append("$propName=$propValue\n") }
                 cmd("echo '${sb.toString()}' > $customPropFile").exec()
                 cmd("chmod 644 $customPropFile").exec()
                 updateSystemProp(name, value)
 
                 handler.post {Toast.makeText(requireContext(), getString(R.string.prop_saved),Toast.LENGTH_LONG).show()
-                loadPropsData()
+                    loadPropsData()
                 }
 
             } catch (_: Exception) {
