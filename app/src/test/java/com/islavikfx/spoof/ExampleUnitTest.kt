@@ -11,12 +11,12 @@ class UnitTest {
 
     @Test
     fun parseJson() = runBlocking {
-        val json = """{"author": "iSlavik", "username": "@islavikfx", "version": "1.2.0"}"""
+        val json = """{"author": "iSlavik", "username": "@islavikfx", "version": "1.3.0"}"""
         val gson = Gson()
         val user: User = gson.fromJson(json, User::class.java)
         assertEquals("iSlavik", user.author)
         assertEquals("@islavikfx", user.username)
-        assertEquals("1.2.0", user.version)
+        assertEquals("1.3.0", user.version)
     }
 
 }
