@@ -5,7 +5,7 @@
 ![](https://github.com/islavikfx/Android-Spoof/blob/main/img/preview2.png?raw=true)
 
 
-#### v1.2.0 (29 August 2026):
+#### v1.3.0 (18 October 2026):
 
 `+` **Advertising ID Menu** - Can reset Ad ID or clear all data of Google services.
 
@@ -17,7 +17,7 @@
 
 `+` **Configure Device Apps** - Can delete any device apps (user / system / kernel) and erase all of it data.
 
-`+` **Settings Menu** - Clear dalvik-cache, reboot, select app theme.
+`+` **Settings Menu** - Clear system logs / cache, reboot, select app themes.
 
 If you want to see something new in the app or you've found a bug - open an issue on this GitHub page.
 
