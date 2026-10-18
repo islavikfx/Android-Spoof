@@ -1,3 +1,7 @@
 -optimizationpasses 5
--optimizations !code/simplification/arithmetic,!field/*,!class/merging/*
 -allowaccessmodification
+-dontpreverify
+
+-optimizations code/simplification/constant
+-optimizations method/propagation/argument
+-keepattributes RuntimeVisibleAnnotations
