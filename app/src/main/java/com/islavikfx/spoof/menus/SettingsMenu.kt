@@ -11,6 +11,8 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.graphics.toColorInt
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
+import com.islavikfx.spoof.AppActivity
 import com.islavikfx.spoof.R
 import com.topjohnwu.superuser.Shell
 
@@ -19,21 +21,18 @@ class SettingsMenu : BaseMenu() {
 
     private val handler = Handler(Looper.getMainLooper())
     private val themeColors = listOf(R.id.t_purple to "#9C27B0",
-        R.id.t_red to "#FF0000",
-        R.id.t_blue to "#2196F3",
-        R.id.t_green to "#4CAF50",
-        R.id.t_pink to "#E91E63",
-        R.id.t_cyan to "#00BCD4",
-        R.id.t_orange to "#FF9800",
-        R.id.t_teal to "#009688")
+    R.id.t_red to "#FF0000", R.id.t_blue to "#2196F3",
+    R.id.t_green to "#4CAF50", R.id.t_pink to "#E91E63",
+    R.id.t_cyan to "#00BCD4", R.id.t_orange to "#FF9800",
+    R.id.t_teal to "#009688")
 
 
-    override fun draw(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View =
-        inflater.inflate(R.layout.menu_settings, container, false)
+    override fun draw(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View = inflater.inflate(R.layout.menu_settings, container, false)
 
     override fun setup(view: View, state: Bundle?) {
         setupBackButton(view)
         setupTitle(view)
+        setupThemeModeSelector(view)
         setupThemeSelector(view)
         setupClearButton(view)
         setupRebootButton(view) }
@@ -46,6 +45,23 @@ class SettingsMenu : BaseMenu() {
 
     private fun setupTitle(view: View) {
         view.findViewById<TextView>(R.id.bar_title).text = title()
+    }
+
+    private fun setupThemeModeSelector(view: View) {
+        val lightCard: MaterialCardView = view.findViewById(R.id.mode_light)
+        val darkCard: MaterialCardView = view.findViewById(R.id.mode_dark)
+        val color = getCurrentThemeColor().toColorInt()
+        val currentMode = activity.getThemeMode()
+
+        lightCard.strokeColor = color
+        darkCard.strokeColor = color
+        lightCard.strokeWidth = if (currentMode == AppActivity.MODE_LIGHT) 4 else 2
+        darkCard.strokeWidth = if (currentMode == AppActivity.MODE_DARK) 4 else 2
+
+        lightCard.setOnClickListener {
+            activity.setThemeMode(AppActivity.MODE_LIGHT) }
+        darkCard.setOnClickListener {
+            activity.setThemeMode(AppActivity.MODE_DARK) }
     }
 
     private fun setupClearButton(view: View) {
@@ -79,8 +95,7 @@ class SettingsMenu : BaseMenu() {
                 updateThemeColor(color)
                 highlightSelectedTheme(view, color) }
             themeView?.isClickable = true
-            themeView?.isFocusable = true
-            themeView?.background = null }
+            themeView?.isFocusable = true }
         highlightSelectedTheme(view, currentColor)
     }
 
@@ -121,7 +136,12 @@ class SettingsMenu : BaseMenu() {
 
 
     private fun clearSystemCache() {
-        Thread { Shell.cmd("rm -rf /data/cache/*", "rm -rf /data/dalvik-cache/*", "rm -rf /data/log/*", "reboot").submit()
+        Thread { Shell.cmd("rm -rf /data/log/* /data/mdlog/* /data/anr/* /data/dalvik-cache/* " +
+         "/data/resource-cache/* /data/semclipboard/* /data/semprivateshare/* " +
+         "/data/tombstones/* /data/debuglogger/* /data/cache/* /data/nfc_log/* " +
+         "/data/system/package_cache/* /data/system/battery-history/* " +
+         "/data/local/tmp/* /data/sec/log/* /data/vendor/log/* 2>/dev/null").exec()
+            handler.post { showToast(getString(R.string.cache_cleared)) }
         }.start()
     }
     private fun rebootDevice() {
