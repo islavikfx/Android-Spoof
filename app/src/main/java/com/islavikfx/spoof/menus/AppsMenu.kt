@@ -1,7 +1,6 @@
 package com.islavikfx.spoof.menus
 import android.annotation.SuppressLint
 import android.app.Dialog
-import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.Bundle
@@ -53,8 +52,7 @@ class AppsMenu : BaseMenu() {
         }
 
         view.findViewById<ImageView>(R.id.btn_back).setOnClickListener {
-            parentFragmentManager.popBackStack()
-        }
+            parentFragmentManager.popBackStack() }
         view.findViewById<TextView>(R.id.bar_title).text = title()
         recyclerView = view.findViewById(R.id.rec)
         searchEdit = view.findViewById(R.id.search)
@@ -92,7 +90,7 @@ class AppsMenu : BaseMenu() {
             showWarningDialog()
         } else {
             searchEdit.visibility = View.VISIBLE
-            loadAppsFromDataDirs()
+            loadAppsFromPm()
         }
     }
 
@@ -108,13 +106,13 @@ class AppsMenu : BaseMenu() {
             dialog.dismiss()
             warningShown = true
             searchEdit.visibility = View.VISIBLE
-            loadAppsFromDataDirs()
+            loadAppsFromPm()
         }
         dialog.show()
         dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.9).toInt(), WindowManager.LayoutParams.WRAP_CONTENT)
     }
 
-    private fun loadAppsFromDataDirs() {
+    private fun loadAppsFromPm() {
         isLoading = true
         loadingText.visibility = View.VISIBLE
         loadingProgress.visibility = View.VISIBLE
@@ -125,14 +123,58 @@ class AppsMenu : BaseMenu() {
             try {
                 val pm = requireContext().packageManager
                 val tempList = mutableListOf<AppItem>()
-                val seenPackages = mutableSetOf<String>()
+                val seen = mutableSetOf<String>()
 
-                scanDataUserDir(pm, tempList, seenPackages)
-                scanDataAppDir(pm, tempList, seenPackages)
+                val listResult = Shell.cmd("pm list packages").exec()
+                if (listResult.isSuccess) {
+                    for (line in listResult.out) {
+                        val pkg = line.removePrefix("package:").trim()
+                        if (pkg.isEmpty() || !pkg.contains(".") || seen.contains(pkg)) continue
+                        seen.add(pkg)
 
-                val sortedApps = tempList.distinctBy { it.packageName }.sortedBy { it.label.lowercase() }
+                        var label = pkg.substringAfterLast(".")
+                        var icon: Drawable = pm.defaultActivityIcon
+                        var primaryApk = ""
+                        var permissions: List<String> = emptyList()
+
+                        try {
+                            val ai = pm.getApplicationInfo(pkg, 0)
+                            label = pm.getApplicationLabel(ai).toString()
+                            icon = ai.loadIcon(pm)
+                        } catch (_: Exception) {}
+
+                        val pathResult = Shell.cmd("pm path $pkg").exec()
+                        if (pathResult.isSuccess) {
+                            for (p in pathResult.out) {
+                                val path = p.removePrefix("package:").trim()
+                                if (path.isEmpty()) continue
+                                if (path.contains("split_config")) continue
+                                if (path.contains("/base.apk")) { primaryApk = path; break }
+                                if (primaryApk.isEmpty()) primaryApk = path
+                            }
+                        }
+
+                        if (primaryApk.isNotEmpty()) {
+                            try {
+                                val archive = pm.getPackageArchiveInfo(primaryApk, PackageManager.GET_PERMISSIONS)
+                                val aai = archive?.applicationInfo
+                                if (aai != null) {
+                                    aai.sourceDir = primaryApk
+                                    aai.publicSourceDir = primaryApk
+                                    try { label = pm.getApplicationLabel(aai).toString() } catch (_: Exception) {}
+                                    try { icon = aai.loadIcon(pm) } catch (_: Exception) {}
+                                }
+                                permissions = archive?.requestedPermissions?.toList() ?: emptyList()
+                            } catch (_: Exception) {}
+                        }
+
+                        tempList.add(AppItem(label, pkg, icon, primaryApk, permissions))
+                    }
+                }
+
+                val sorted = tempList.sortedBy { it.label.lowercase() }
                 allApps.clear()
-                allApps.addAll(sortedApps)
+                allApps.addAll(sorted)
 
                 handler.post {
                     isLoading = false
@@ -156,172 +198,6 @@ class AppsMenu : BaseMenu() {
         }.start()
     }
 
-    private fun scanDataUserDir(pm: PackageManager, tempList: MutableList<AppItem>, seenPackages: MutableSet<String>) {
-        try {
-            val result = Shell.cmd("ls /data/user/0/").exec()
-            if (!result.isSuccess || result.out.isEmpty()) return
-
-            for (line in result.out) {
-                val packageName = line.trim()
-                if (packageName.isEmpty() || packageName.startsWith(".")) continue
-                if (seenPackages.contains(packageName)) continue
-                if (!packageName.contains(".")) continue
-
-                try {
-                    var label = packageName.substringAfterLast(".")
-                    var icon: Drawable = pm.defaultActivityIcon
-                    var appInfo: ApplicationInfo? = null
-                    var apkPath = ""
-
-                    try {
-                        appInfo = pm.getApplicationInfo(packageName, 0)
-                        val info = appInfo
-                        label = pm.getApplicationLabel(info).toString()
-                        info.loadIcon(pm).also { icon = it }
-                        apkPath = info.sourceDir ?: ""
-                    } catch (_: Exception) {
-                        try {
-                            appInfo = pm.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
-                            if (appInfo != null) {
-                                val info = appInfo
-                                label = pm.getApplicationLabel(info).toString()
-                                icon = info.loadIcon(pm)
-                                apkPath = info.sourceDir ?: ""
-                            }
-                        } catch (_: Exception) {
-                            apkPath = findApkPath(packageName)
-                        }
-                    }
-
-                    if (apkPath.isEmpty()) {
-                        apkPath = findApkPath(packageName)
-                    }
-
-                    seenPackages.add(packageName)
-                    tempList.add(AppItem(label, packageName, icon, apkPath))
-                } catch (_: Exception) {
-                    continue
-                }
-            }
-        } catch (_: Exception) {}
-    }
-
-    private fun scanDataAppDir(pm: PackageManager, tempList: MutableList<AppItem>, seenPackages: MutableSet<String>) {
-        try {
-            val result = Shell.cmd("ls /data/app/").exec()
-            if (!result.isSuccess || result.out.isEmpty()) return
-
-            for (line in result.out) {
-                val dirName = line.trim()
-                if (dirName.isEmpty()) continue
-
-                if (dirName.startsWith("~~")) {
-                    scanEncryptedAppDir(dirName, pm, tempList, seenPackages)
-                } else {
-                    val packageName = dirName.substringBeforeLast("-")
-                    if (packageName.contains(".") && !seenPackages.contains(packageName)) {
-                        try {
-                            addAppFromPackage(packageName, pm, tempList, seenPackages)
-                        } catch (_: Exception) {}
-                    }
-                }
-            }
-        } catch (_: Exception) {}
-    }
-
-    private fun scanEncryptedAppDir(dirName: String, pm: PackageManager, tempList: MutableList<AppItem>, seenPackages: MutableSet<String>) {
-        try {
-            val result = Shell.cmd("ls /data/app/$dirName/").exec()
-            if (!result.isSuccess || result.out.isEmpty()) return
-
-            for (line in result.out) {
-                val subDir = line.trim()
-                if (subDir.isEmpty()) continue
-
-                val packageName = extractPackageFromEncrypted(subDir)
-                if (packageName != null && packageName.contains(".") && !seenPackages.contains(packageName)) {
-                    try {
-                        addAppFromPackage(packageName, pm, tempList, seenPackages)
-                    } catch (_: Exception) {}
-                }
-            }
-        } catch (_: Exception) {}
-    }
-
-    private fun extractPackageFromEncrypted(encryptedName: String): String? {
-        return try {
-            val baseName = encryptedName.substringBeforeLast("-")
-            if (baseName.contains(".")) baseName else null
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun findApkPath(packageName: String): String {
-        try {
-            val result = Shell.cmd("find /data/app/ -name 'base.apk' -path '*/$packageName-*' 2>/dev/null | head -1").exec()
-            if (result.isSuccess && result.out.isNotEmpty()) {
-                return result.out[0].trim()
-            }
-
-            val encryptedResult = Shell.cmd("find /data/app/~~*/ -name 'base.apk' -path '*$packageName*' 2>/dev/null | head -1").exec()
-            if (encryptedResult.isSuccess && encryptedResult.out.isNotEmpty()) {
-                return encryptedResult.out[0].trim()
-            }
-
-            return ""
-        } catch (_: Exception) {
-            return ""
-        }
-    }
-
-    private fun addAppFromPackage(packageName: String, pm: PackageManager, tempList: MutableList<AppItem>, seenPackages: MutableSet<String>) {
-        try {
-            var label = packageName.substringAfterLast(".")
-            var icon: Drawable = pm.defaultActivityIcon
-            var apkPath = ""
-            var appInfo: ApplicationInfo? = null
-
-            try {
-                appInfo = pm.getApplicationInfo(packageName, 0)
-                if (appInfo != null) {
-                    val info = appInfo
-                    label = pm.getApplicationLabel(info).toString()
-                    icon = info.loadIcon(pm)
-                    apkPath = info.sourceDir ?: ""
-                }
-            } catch (_: Exception) {
-                val foundApkPath = findApkPath(packageName)
-                if (foundApkPath.isNotEmpty()) {
-                    val archiveInfo = pm.getPackageArchiveInfo(foundApkPath, 0)
-                    val archiveAppInfo = archiveInfo?.applicationInfo
-                    if (archiveAppInfo != null) {
-                        archiveAppInfo.sourceDir = foundApkPath
-                        archiveAppInfo.publicSourceDir = foundApkPath
-                        label = try {
-                            pm.getApplicationLabel(archiveAppInfo).toString()
-                        } catch (_: Exception) {
-                            packageName.substringAfterLast(".")
-                        }
-                        icon = try {
-                            archiveAppInfo.loadIcon(pm)
-                        } catch (_: Exception) {
-                            pm.defaultActivityIcon
-                        }
-                        apkPath = foundApkPath
-                    }
-                }
-            }
-
-            if (apkPath.isEmpty()) {
-                apkPath = findApkPath(packageName)
-            }
-
-            seenPackages.add(packageName)
-            tempList.add(AppItem(label, packageName, icon, apkPath))
-        } catch (_: Exception) {}
-    }
-
     @SuppressLint("NotifyDataSetChanged")
     private fun filterApps(query: String) {
         if (isLoading) return
@@ -331,89 +207,25 @@ class AppsMenu : BaseMenu() {
                 filteredApps.addAll(allApps)
             } else {
                 val lowerQuery = query.lowercase()
-                filteredApps.addAll(allApps.filter {
-                    it.label.lowercase().contains(lowerQuery) ||
-                            it.packageName.lowercase().contains(lowerQuery)
-                })
+                filteredApps.addAll(allApps.filter { it.label.lowercase().contains(lowerQuery) || it.packageName.lowercase().contains(lowerQuery) })
             }
             adapter.notifyDataSetChanged()
         } catch (_: Exception) {}
     }
 
     private fun forceStopApp(packageName: String): Boolean {
-        return Shell.cmd("am force-stop $packageName").exec().isSuccess
+        return Shell.cmd("am force-stop --user 0 $packageName 2>/dev/null").exec().isSuccess
     }
 
     private fun clearAppData(packageName: String): Boolean {
-        var result = Shell.cmd("pm clear $packageName").exec()
-        if (!result.isSuccess) {
-            result = Shell.cmd("pm clear --user 0 $packageName").exec()
-        }
-        if (!result.isSuccess) {
-            Shell.cmd("rm -rf /data/data/$packageName", "rm -rf /data/user/0/$packageName", "rm -rf /data/user_de/0/$packageName").exec()
-            result = Shell.cmd("echo 1").exec()
-        }
-        return result.isSuccess
+        return Shell.cmd("rm -rf /data/data/$packageName/*").exec().isSuccess
     }
 
-    @SuppressLint("SdCardPath")
-    private fun getAppSize(packageName: String, apkPath: String): String {
+    private fun uninstallAppCompletely(packageName: String): Boolean {
         try {
-            val paths = mutableListOf<String>()
-            if (apkPath.isNotEmpty()) {
-                val apkDir = apkPath.substringBeforeLast("/")
-                if (apkDir.isNotEmpty()) paths.add(apkDir)
-            }
-            paths.add("/data/data/$packageName")
-            paths.add("/data/user/0/$packageName")
-
-            var totalSize = 0L
-            for (path in paths) {
-                val result = Shell.cmd("du -sk $path 2>/dev/null | awk '{print \$1}'").exec()
-                if (result.isSuccess && result.out.isNotEmpty()) {
-                    val sizeStr = result.out[0].trim()
-                    if (sizeStr.isNotEmpty() && sizeStr.all { it.isDigit() }) {
-                        totalSize += sizeStr.toLong() * 1024
-                    }
-                }
-            }
-            return if (totalSize > 0) formatSize(totalSize) else "N/A"
-        } catch (_: Exception) {
-            return "N/A"
-        }
-    }
-
-    private fun formatSize(bytes: Long): String {
-        return when {
-            bytes >= 1024 * 1024 * 1024 -> "%.2f GB".format(bytes.toDouble() / (1024 * 1024 * 1024))
-            bytes >= 1024 * 1024 -> "%.1f MB".format(bytes.toDouble() / (1024 * 1024))
-            bytes >= 1024 -> "%.0f KB".format(bytes.toDouble() / 1024)
-            else -> "$bytes B"
-        }
-    }
-
-    private fun uninstallAppCompletely(packageName: String, apkPath: String): Boolean {
-        try {
-            Shell.cmd("am force-stop $packageName", "pm disable $packageName 2>/dev/null", "pm disable --user 0 $packageName 2>/dev/null", "pm suspend $packageName 2>/dev/null").exec()
-            Shell.cmd("pm uninstall $packageName 2>/dev/null", "pm uninstall --user 0 $packageName 2>/dev/null", "pm uninstall -k --user 0 $packageName 2>/dev/null").exec()
-            Shell.cmd("mount -o rw,remount / 2>/dev/null", "mount -o rw,remount /system 2>/dev/null", "mount -o rw,remount /product 2>/dev/null", "mount -o rw,remount /vendor 2>/dev/null").exec()
-
-            if (apkPath.isNotEmpty()) {
-                val appDir = apkPath.substringBeforeLast("/")
-                Shell.cmd("rm -rf $appDir", "rm -f $apkPath").exec()
-            }
-
-            Shell.cmd("rm -rf /data/data/$packageName", "rm -rf /data/user/0/$packageName", "rm -rf /data/user_de/0/$packageName",
-                "rm -rf /data/media/0/Android/data/$packageName", "rm -rf /sdcard/Android/data/$packageName",
-                "rm -rf /storage/emulated/0/Android/data/$packageName", "rm -rf /data/dalvik-cache/*${packageName.replace(".", "-")}*",
-                "find /data/app/ -name '*.apk' -path '*$packageName*' -exec rm -rf {} \\; 2>/dev/null").exec()
-
-            Shell.cmd("sed -i '/$packageName/d' /data/system/packages.xml 2>/dev/null", "sed -i '/$packageName/d' /data/system/packages.list 2>/dev/null",
-                "rm -f /data/system/package_cache/* 2>/dev/null").exec()
-
-            Shell.cmd("mount -o ro,remount / 2>/dev/null", "mount -o ro,remount /system 2>/dev/null", "mount -o ro,remount /product 2>/dev/null",
-                "mount -o ro,remount /vendor 2>/dev/null").exec()
-
+            Shell.cmd("am force-stop --user 0 $packageName 2>/dev/null",
+                "pm disable-user --user 0 $packageName 2>/dev/null",
+                "pm uninstall --user 0 $packageName 2>/dev/null").exec()
             return true
         } catch (_: Exception) {
             return false
@@ -435,33 +247,18 @@ class AppsMenu : BaseMenu() {
         view.findViewById<ImageView>(R.id.app_icon).setImageDrawable(item.icon)
         view.findViewById<TextView>(R.id.app_label).text = item.label
         view.findViewById<TextView>(R.id.app_pkg).text = item.packageName
-        view.findViewById<TextView>(R.id.app_size).text = getString(R.string.calculating)
+        view.findViewById<TextView>(R.id.app_path).text = "Path: ${item.primaryApk.ifEmpty { getString(R.string.not_found_base_apk) }}"
 
-        Thread {
-            val size = getAppSize(item.packageName, item.apkPath)
-            handler.post {
-                view.findViewById<TextView>(R.id.app_size).text = "Size: $size"
-            }
-        }.start()
-
-        view.findViewById<TextView>(R.id.app_path).text = "Path: ${item.apkPath.ifEmpty { "N/A" }}"
-
-        try {
-            val pi = requireContext().packageManager.getPackageInfo(item.packageName, PackageManager.GET_PERMISSIONS)
-            val perms = pi.requestedPermissions
-            if (!perms.isNullOrEmpty()) {
-                val shortPerms = perms.map { it.substringAfterLast('.') }
-                val permsText = if (shortPerms.size <= 5) {
-                    shortPerms.joinToString(", ")
-                } else {
-                    shortPerms.take(5).joinToString(", ") + " and (${shortPerms.size - 5}) more…"
-                }
-                view.findViewById<TextView>(R.id.app_perms).text = "Permissions: $permsText."
+        if (item.permissions.isEmpty()) {
+            view.findViewById<TextView>(R.id.app_perms).text = getString(R.string.no_permissions)
+        } else {
+            val shortPerms = item.permissions.map { it.substringAfterLast('.') }
+            val permsText = if (shortPerms.size <= 5) {
+                shortPerms.joinToString(", ")
             } else {
-                view.findViewById<TextView>(R.id.app_perms).text = "No permissions."
+                shortPerms.take(5).joinToString(", ") + " and (${shortPerms.size - 5}) more…"
             }
-        } catch (_: Exception) {
-            view.findViewById<TextView>(R.id.app_perms).text = "Failed extracting permissions."
+            view.findViewById<TextView>(R.id.app_perms).text = getString(R.string.app_perms, permsText)
         }
 
         val cancelBtn: MaterialButton = view.findViewById(R.id.btn_cancel)
@@ -482,7 +279,7 @@ class AppsMenu : BaseMenu() {
             Thread {
                 val success = forceStopApp(item.packageName)
                 handler.post {
-                    showToast(if (success) "[+] ${item.label} stopped." else "[-] Failed to stop.")
+                    showToast(getString(if (success) R.string.app_stopped else R.string.app_stop_fail, item.label))
                 }
             }.start()
         }
@@ -492,7 +289,7 @@ class AppsMenu : BaseMenu() {
             Thread {
                 val success = clearAppData(item.packageName)
                 handler.post {
-                    showToast(if (success) "[+] Data cleared." else "[-] Failed to clear data.")
+                    showToast(getString(if (success) R.string.app_data_cleared else R.string.app_data_clear_fail, item.label))
                 }
             }.start()
         }
@@ -500,10 +297,10 @@ class AppsMenu : BaseMenu() {
         deleteBtn.setOnClickListener {
             dialog.dismiss()
             Thread {
-                uninstallAppCompletely(item.packageName, item.apkPath)
+                uninstallAppCompletely(item.packageName)
                 handler.post {
                     showRemovedDialog(item)
-                    loadAppsFromDataDirs()
+                    loadAppsFromPm()
                 }
             }.start()
         }
@@ -541,17 +338,14 @@ class AppsMenu : BaseMenu() {
 
     override fun title(): String = getString(R.string.configure_device_apps)
 
-    data class AppItem(
-        val label: String,
-        val packageName: String,
-        val icon: Drawable,
-        val apkPath: String
-    )
+    data class AppItem(val label: String,
+        val packageName: String, val icon: Drawable,
+        val primaryApk: String, val permissions: List<String>)
 }
 
-class AppsAdapter(private val items: List<AppsMenu.AppItem>,
-    private val onEdit: (AppsMenu.AppItem) -> Unit,
-    private val themeColor: String) : RecyclerView.Adapter<AppsAdapter.ViewHolder>() {
+
+class AppsAdapter(private val items: List<AppsMenu.AppItem>, private val onEdit: (AppsMenu.AppItem) -> Unit,
+private val themeColor: String) : RecyclerView.Adapter<AppsAdapter.ViewHolder>() {
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val icon: ImageView = view.findViewById(R.id.app_icon)
