@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#0D0D0D">
+    android:background="?attr/spoof_bg">
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -24,7 +24,7 @@
             android:rotation="180"
             android:padding="12dp"
             android:contentDescription="@string/desc_back"
-            android:foreground="?attr/selectableItemBackgroundBorderless" />
+            android:foreground="?attr/selectableItemBackgroundBorderless"/>
         <TextView
             android:id="@+id/bar_title"
             android:layout_width="0dp"
@@ -32,10 +32,10 @@
             android:layout_weight="1"
             android:layout_marginEnd="48dp"
             android:text="@string/hide_props"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/spoof_text"
             android:textSize="18sp"
             android:textStyle="bold"
-            android:gravity="center" />
+            android:gravity="center"/>
     </LinearLayout>
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
@@ -43,7 +43,7 @@
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="12dp"
-        app:cardBackgroundColor="#1A1A1A"
+        app:cardBackgroundColor="?attr/spoof_card"
         app:cardCornerRadius="24dp"
         app:cardElevation="0dp"
         app:strokeColor="#9C27B0"
@@ -53,15 +53,15 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:hint="@string/search_props"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#AAAAAA"
+            android:textColor="?attr/spoof_text"
+            android:textColorHint="?attr/spoof_text_dim"
             android:textSize="14sp"
             android:paddingStart="20dp"
             android:paddingEnd="20dp"
             android:background="@android:color/transparent"
             android:maxLines="1"
             android:inputType="text"
-            android:autofillHints="no" />
+            android:autofillHints="no"/>
     </com.google.android.material.card.MaterialCardView>
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rec"
@@ -74,5 +74,5 @@
         android:scrollbars="vertical"
         android:fadeScrollbars="false"
         android:scrollbarSize="4dp"
-        android:scrollbarStyle="insideOverlay" />
+        android:scrollbarStyle="insideOverlay"/>
 </LinearLayout>

@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#0D0D0D"
+    android:background="?attr/spoof_bg"
     android:clickable="true"
     android:focusable="true">
     <LinearLayout
@@ -26,18 +26,18 @@
             android:rotation="180"
             android:padding="12dp"
             android:contentDescription="@string/desc_back"
-            android:foreground="?attr/selectableItemBackgroundBorderless" />
+            android:foreground="?attr/selectableItemBackgroundBorderless"/>
         <TextView
             android:id="@+id/bar_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginEnd="48dp"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/spoof_text"
             android:textSize="18sp"
             android:textStyle="bold"
             android:gravity="center"
-            android:fontFamily="@font/poppins_bold" />
+            android:fontFamily="@font/poppins_bold"/>
     </LinearLayout>
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
@@ -45,7 +45,7 @@
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="8dp"
-        app:cardBackgroundColor="#1A1A1A"
+        app:cardBackgroundColor="?attr/spoof_card"
         app:cardCornerRadius="24dp"
         app:cardElevation="0dp"
         app:strokeColor="#9C27B0"
@@ -55,15 +55,15 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:hint="@string/search_apps"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#666666"
+            android:textColor="?attr/spoof_text"
+            android:textColorHint="?attr/spoof_hint"
             android:textSize="14sp"
             android:paddingStart="20dp"
             android:paddingEnd="20dp"
             android:background="@android:color/transparent"
             android:maxLines="1"
             android:inputType="text"
-            android:autofillHints="no" />
+            android:autofillHints="no"/>
     </com.google.android.material.card.MaterialCardView>
     <FrameLayout
         android:layout_width="match_parent"
@@ -78,7 +78,7 @@
             android:paddingEnd="16dp"
             android:clipToPadding="false"
             android:scrollbars="vertical"
-            android:visibility="gone" />
+            android:visibility="gone"/>
         <LinearLayout
             android:id="@+id/loading_layout"
             android:layout_width="match_parent"
@@ -91,16 +91,16 @@
                 style="?android:attr/progressBarStyleLarge"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:indeterminateTint="#FFFFFF" />
+                android:indeterminateTint="?attr/spoof_text"/>
             <TextView
                 android:id="@+id/loading_txt"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/loading_apps"
-                android:textColor="#FFFFFF"
+                android:textColor="?attr/spoof_text"
                 android:textSize="20sp"
                 android:layout_marginTop="16dp"
-                android:fontFamily="@font/poppins_regular" />
+                android:fontFamily="@font/poppins_regular"/>
         </LinearLayout>
     </FrameLayout>
 </LinearLayout>

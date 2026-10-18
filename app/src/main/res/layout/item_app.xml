@@ -4,10 +4,10 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="8dp"
-    app:cardBackgroundColor="#1A1A1A"
+    app:cardBackgroundColor="?attr/spoof_card"
     app:cardCornerRadius="12dp"
     app:cardElevation="0dp"
-    app:strokeColor="#333333"
+    app:strokeColor="?attr/spoof_stroke"
     app:strokeWidth="1dp">
     <LinearLayout
         android:layout_width="match_parent"
@@ -20,7 +20,7 @@
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:layout_marginEnd="12dp"
-            android:contentDescription="@null" />
+            android:contentDescription="@null"/>
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -30,22 +30,22 @@
                 android:id="@+id/app_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="#FFFFFF"
+                android:textColor="?attr/spoof_text"
                 android:textSize="14sp"
                 android:textStyle="bold"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:fontFamily="@font/poppins_bold" />
+                android:fontFamily="@font/poppins_bold"/>
             <TextView
                 android:id="@+id/app_pkg"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="#888888"
+                android:textColor="?attr/spoof_text_dim"
                 android:textSize="11sp"
                 android:layout_marginTop="2dp"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:fontFamily="@font/poppins_regular" />
+                android:fontFamily="@font/poppins_regular"/>
         </LinearLayout>
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/edit_ctr"
@@ -69,7 +69,7 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:minHeight="48dp"
-                android:fontFamily="@font/poppins_bold" />
+                android:fontFamily="@font/poppins_bold"/>
         </com.google.android.material.card.MaterialCardView>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
