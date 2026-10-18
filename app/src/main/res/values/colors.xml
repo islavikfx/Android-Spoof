@@ -9,15 +9,8 @@
     <color name="cyan">#00BCD4</color>
     <color name="orange">#FF9800</color>
     <color name="teal">#009688</color>
-    <color name="dark_background">#0D0D0D</color>
-    <color name="card_background">#1A1A1A</color>
-    <color name="console_background">#0A0A0A</color>
-    <color name="text_primary">#FFFFFF</color>
-    <color name="text_secondary">#66FFFFFF</color>
-    <color name="text_dim">#44FFFFFF</color>
     <color name="colorPrimary">#6200EE</color>
     <color name="colorPrimaryDark">#3700B3</color>
     <color name="colorAccent">#03DAC6</color>
-    <color name="colorBackground">#0A0A0A</color>
     <color name="ic_launcher_background">#28ADAD</color>
 </resources>

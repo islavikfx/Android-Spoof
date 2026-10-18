@@ -1,16 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.AndroidSpoof" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <attr name="spoof_bg" format="color" />
+    <attr name="spoof_card" format="color" />
+    <attr name="spoof_text" format="color" />
+    <attr name="spoof_text_secondary" format="color" />
+    <attr name="spoof_text_dim" format="color" />
+    <attr name="spoof_hint" format="color" />
+    <attr name="spoof_stroke" format="color" />
+    <style name="Theme.AndroidSpoof" parent="Theme.MaterialComponents.NoActionBar">
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryVariant">@color/colorPrimaryDark</item>
         <item name="colorOnPrimary">#000000</item>
         <item name="colorSecondary">@color/colorAccent</item>
         <item name="colorSecondaryVariant">@color/colorAccent</item>
         <item name="colorOnSecondary">#000000</item>
-        <item name="android:statusBarColor">#000000</item>
-        <item name="android:navigationBarColor">#000000</item>
-        <item name="android:windowBackground">#000000</item>
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    </style>
+    <style name="Theme.AndroidSpoof.Dark" parent="Theme.AndroidSpoof">
+        <item name="spoof_bg">#0D0D0D</item>
+        <item name="spoof_card">#1A1A1A</item>
+        <item name="spoof_text">#FFFFFF</item>
+        <item name="spoof_text_secondary">#CCCCCC</item>
+        <item name="spoof_text_dim">#AAAAAA</item>
+        <item name="spoof_hint">#666666</item>
+        <item name="spoof_stroke">#333333</item>
+        <item name="android:statusBarColor">#0D0D0D</item>
+        <item name="android:navigationBarColor">#0D0D0D</item>
+        <item name="android:windowBackground">#0D0D0D</item>
+    </style>
+    <style name="Theme.AndroidSpoof.Light" parent="Theme.AndroidSpoof">
+        <item name="spoof_bg">#F5F5F5</item>
+        <item name="spoof_card">#FFFFFF</item>
+        <item name="spoof_text">#111111</item>
+        <item name="spoof_text_secondary">#333333</item>
+        <item name="spoof_text_dim">#666666</item>
+        <item name="spoof_hint">#999999</item>
+        <item name="spoof_stroke">#DDDDDD</item>
+        <item name="android:statusBarColor">#F5F5F5</item>
+        <item name="android:navigationBarColor">#F5F5F5</item>
+        <item name="android:windowBackground">#F5F5F5</item>
     </style>
 </resources>
