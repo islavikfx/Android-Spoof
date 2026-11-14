@@ -1,7 +1,6 @@
 package com.islavikfx.spoof.menus
 import android.annotation.SuppressLint
 import android.app.Dialog
-import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Handler
@@ -22,6 +21,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.islavikfx.spoof.R
+import com.islavikfx.spoof.utils.AppInfoResolver
 import com.topjohnwu.superuser.Shell
 
 
@@ -33,6 +33,7 @@ class AppsMenu : BaseMenu() {
     private lateinit var adapter: AppsAdapter
     private lateinit var loadingText: TextView
     private lateinit var loadingProgress: ProgressBar
+    private lateinit var resolver: AppInfoResolver
     private val allApps = mutableListOf<AppItem>()
     private val filteredApps = mutableListOf<AppItem>()
     private var warningShown = false
@@ -51,14 +52,18 @@ class AppsMenu : BaseMenu() {
             return
         }
 
-        view.findViewById<ImageView>(R.id.btn_back).setOnClickListener {
-            parentFragmentManager.popBackStack() }
+        resolver = AppInfoResolver(requireContext())
+
+        view.findViewById<ImageView>(R.id.btn_back).setOnClickListener { parentFragmentManager.popBackStack()
+        }
         view.findViewById<TextView>(R.id.bar_title).text = title()
+
         recyclerView = view.findViewById(R.id.rec)
         searchEdit = view.findViewById(R.id.search)
         loadingText = view.findViewById(R.id.loading_txt)
         loadingProgress = view.findViewById(R.id.loading_progress)
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
+
         adapter = AppsAdapter(filteredApps, { app -> if (!isBusy && !isLoading) showAppDialog(app) }, getThemeColor())
         recyclerView.adapter = adapter
 
@@ -69,7 +74,7 @@ class AppsMenu : BaseMenu() {
                 searchText = s?.toString()?.lowercase() ?: ""
                 searchHandler.removeCallbacksAndMessages(null)
                 searchHandler.postDelayed({
-                    if (!isLoading && searchText == (searchEdit.text.toString().lowercase())) {
+                    if (!isLoading && searchText == searchEdit.text.toString().lowercase()) {
                         filterApps(searchText)
                     }
                 }, 300)
@@ -100,14 +105,17 @@ class AppsMenu : BaseMenu() {
         val view = LayoutInflater.from(requireContext()).inflate(R.layout.dlg_warn_apps, null, false)
         dialog.setContentView(view)
         dialog.setCancelable(false)
+
         val okButton: MaterialButton = view.findViewById(R.id.btn_ok)
-        okButton.backgroundTintList = android.content.res.ColorStateList.valueOf(getThemeColor().toColorInt())
+        okButton.backgroundTintList =
+            android.content.res.ColorStateList.valueOf(getThemeColor().toColorInt())
         okButton.setOnClickListener {
             dialog.dismiss()
             warningShown = true
             searchEdit.visibility = View.VISIBLE
             loadAppsFromPm()
         }
+
         dialog.show()
         dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.9).toInt(), WindowManager.LayoutParams.WRAP_CONTENT)
     }
@@ -121,62 +129,15 @@ class AppsMenu : BaseMenu() {
 
         Thread {
             try {
-                val pm = requireContext().packageManager
-                val tempList = mutableListOf<AppItem>()
-                val seen = mutableSetOf<String>()
-
-                val listResult = Shell.cmd("pm list packages").exec()
-                if (listResult.isSuccess) {
-                    for (line in listResult.out) {
-                        val pkg = line.removePrefix("package:").trim()
-                        if (pkg.isEmpty() || !pkg.contains(".") || seen.contains(pkg)) continue
-                        seen.add(pkg)
-
-                        var label = pkg.substringAfterLast(".")
-                        var icon: Drawable = pm.defaultActivityIcon
-                        var primaryApk = ""
-                        var permissions: List<String> = emptyList()
-
-                        try {
-                            val ai = pm.getApplicationInfo(pkg, 0)
-                            label = pm.getApplicationLabel(ai).toString()
-                            icon = ai.loadIcon(pm)
-                        } catch (_: Exception) {}
-
-                        val pathResult = Shell.cmd("pm path $pkg").exec()
-                        if (pathResult.isSuccess) {
-                            for (p in pathResult.out) {
-                                val path = p.removePrefix("package:").trim()
-                                if (path.isEmpty()) continue
-                                if (path.contains("split_config")) continue
-                                if (path.contains("/base.apk")) { primaryApk = path; break }
-                                if (primaryApk.isEmpty()) primaryApk = path
-                            }
-                        }
-
-                        if (primaryApk.isNotEmpty()) {
-                            try {
-                                val archive = pm.getPackageArchiveInfo(primaryApk, PackageManager.GET_PERMISSIONS)
-                                val aai = archive?.applicationInfo
-                                if (aai != null) {
-                                    aai.sourceDir = primaryApk
-                                    aai.publicSourceDir = primaryApk
-                                    try { label = pm.getApplicationLabel(aai).toString() } catch (_: Exception) {}
-                                    try { icon = aai.loadIcon(pm) } catch (_: Exception) {}
-                                }
-                                permissions = archive?.requestedPermissions?.toList() ?: emptyList()
-                            } catch (_: Exception) {}
-                        }
-
-                        tempList.add(AppItem(label, pkg, icon, primaryApk, permissions))
-                    }
+                val resolved = resolver.listAll()
+                val tempList = ArrayList<AppItem>(resolved.size)
+                for (info in resolved) {
+                    tempList.add(AppItem(label = info.label, packageName = info.packageName, icon = info.icon, primaryApk = info.primaryApk))
                 }
 
-                val sorted = tempList.sortedBy { it.label.lowercase() }
-                allApps.clear()
-                allApps.addAll(sorted)
-
                 handler.post {
+                    allApps.clear()
+                    allApps.addAll(tempList)
                     isLoading = false
                     searchEdit.isEnabled = true
                     loadingText.visibility = View.GONE
@@ -206,15 +167,19 @@ class AppsMenu : BaseMenu() {
             if (query.isEmpty()) {
                 filteredApps.addAll(allApps)
             } else {
-                val lowerQuery = query.lowercase()
-                filteredApps.addAll(allApps.filter { it.label.lowercase().contains(lowerQuery) || it.packageName.lowercase().contains(lowerQuery) })
+                val q = query.lowercase()
+                filteredApps.addAll(
+                    allApps.filter { it.label.lowercase().contains(q) || it.packageName.lowercase().contains(q)
+                    }
+                )
             }
             adapter.notifyDataSetChanged()
-        } catch (_: Exception) {}
+        } catch (_: Exception) { }
     }
 
     private fun forceStopApp(packageName: String): Boolean {
-        return Shell.cmd("am force-stop --user 0 $packageName 2>/dev/null").exec().isSuccess
+        return Shell.cmd("am force-stop --user 0 $packageName 2>/dev/null")
+            .exec().isSuccess
     }
 
     private fun clearAppData(packageName: String): Boolean {
@@ -222,13 +187,14 @@ class AppsMenu : BaseMenu() {
     }
 
     private fun uninstallAppCompletely(packageName: String): Boolean {
-        try {
+        return try {
             Shell.cmd("am force-stop --user 0 $packageName 2>/dev/null",
-                "pm disable-user --user 0 $packageName 2>/dev/null",
-                "pm uninstall --user 0 $packageName 2>/dev/null").exec()
-            return true
+             "pm disable-user --user 0 $packageName 2>/dev/null",
+             "pm uninstall --user 0 $packageName 2>/dev/null").exec()
+            resolver.invalidate(packageName)
+            true
         } catch (_: Exception) {
-            return false
+            false
         }
     }
 
@@ -238,27 +204,31 @@ class AppsMenu : BaseMenu() {
         isBusy = true
 
         val dialog = Dialog(requireContext(), R.style.RoundedDialog)
-        val view = LayoutInflater.from(requireContext()).inflate(R.layout.dlg_app, null, false)
+        val view = LayoutInflater.from(requireContext())
+            .inflate(R.layout.dlg_app, null, false)
         dialog.setContentView(view)
         dialog.setCancelable(true)
         dialog.setOnDismissListener { isBusy = false }
 
         val color = getThemeColor().toColorInt()
+
         view.findViewById<ImageView>(R.id.app_icon).setImageDrawable(item.icon)
         view.findViewById<TextView>(R.id.app_label).text = item.label
         view.findViewById<TextView>(R.id.app_pkg).text = item.packageName
         view.findViewById<TextView>(R.id.app_path).text = "Path: ${item.primaryApk.ifEmpty { getString(R.string.not_found_base_apk) }}"
 
-        if (item.permissions.isEmpty()) {
-            view.findViewById<TextView>(R.id.app_perms).text = getString(R.string.no_permissions)
+        val perms = resolver.resolvePermissions(item.packageName)
+        val permsView = view.findViewById<TextView>(R.id.app_perms)
+        if (perms.isEmpty()) {
+            permsView.text = getString(R.string.no_permissions)
         } else {
-            val shortPerms = item.permissions.map { it.substringAfterLast('.') }
-            val permsText = if (shortPerms.size <= 5) {
+            val shortPerms = perms.map { it.substringAfterLast('.') }
+            val text = if (shortPerms.size <= 5) {
                 shortPerms.joinToString(", ")
             } else {
                 shortPerms.take(5).joinToString(", ") + " and (${shortPerms.size - 5}) more…"
             }
-            view.findViewById<TextView>(R.id.app_perms).text = getString(R.string.app_perms, permsText)
+            permsView.text = getString(R.string.app_perms, text)
         }
 
         val cancelBtn: MaterialButton = view.findViewById(R.id.btn_cancel)
@@ -278,8 +248,7 @@ class AppsMenu : BaseMenu() {
             dialog.dismiss()
             Thread {
                 val success = forceStopApp(item.packageName)
-                handler.post {
-                    showToast(getString(if (success) R.string.app_stopped else R.string.app_stop_fail, item.label))
+                handler.post { showToast(getString(if (success) R.string.app_stopped else R.string.app_stop_fail, item.label))
                 }
             }.start()
         }
@@ -333,19 +302,24 @@ class AppsMenu : BaseMenu() {
         laterBtn.setOnClickListener { dialog.dismiss() }
 
         dialog.show()
-        dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.9).toInt(), WindowManager.LayoutParams.WRAP_CONTENT)
+        dialog.window?.setLayout(
+            (resources.displayMetrics.widthPixels * 0.9).toInt(),
+            WindowManager.LayoutParams.WRAP_CONTENT
+        )
     }
 
     override fun title(): String = getString(R.string.configure_device_apps)
 
     data class AppItem(val label: String,
-        val packageName: String, val icon: Drawable,
-        val primaryApk: String, val permissions: List<String>)
+        val packageName: String,
+        val icon: Drawable,
+        val primaryApk: String)
 }
 
 
-class AppsAdapter(private val items: List<AppsMenu.AppItem>, private val onEdit: (AppsMenu.AppItem) -> Unit,
-private val themeColor: String) : RecyclerView.Adapter<AppsAdapter.ViewHolder>() {
+class AppsAdapter(private val items: List<AppsMenu.AppItem>,
+    private val onEdit: (AppsMenu.AppItem) -> Unit,
+    private val themeColor: String) : RecyclerView.Adapter<AppsAdapter.ViewHolder>() {
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val icon: ImageView = view.findViewById(R.id.app_icon)
@@ -356,7 +330,8 @@ private val themeColor: String) : RecyclerView.Adapter<AppsAdapter.ViewHolder>()
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_app, parent, false)
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_app, parent, false)
         return ViewHolder(view)
     }
 
@@ -365,7 +340,6 @@ private val themeColor: String) : RecyclerView.Adapter<AppsAdapter.ViewHolder>()
         holder.icon.setImageDrawable(item.icon)
         holder.label.text = item.label
         holder.pkg.text = item.packageName
-
         val color = themeColor.toColorInt()
         holder.card.strokeColor = color
         holder.card.strokeWidth = 2
@@ -374,5 +348,4 @@ private val themeColor: String) : RecyclerView.Adapter<AppsAdapter.ViewHolder>()
     }
 
     override fun getItemCount(): Int = items.size
-
 }

@@ -1,7 +1,6 @@
 package com.islavikfx.spoof.menus
 import android.annotation.SuppressLint
 import android.app.Dialog
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -21,7 +20,9 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.islavikfx.spoof.R
-import com.islavikfx.spoof.utils.*
+import com.islavikfx.spoof.utils.AppInfoResolver
+import com.islavikfx.spoof.utils.RootUtils
+import com.islavikfx.spoof.utils.SsidProto
 import com.topjohnwu.superuser.Shell
 
 
@@ -33,6 +34,8 @@ class AndroidIdMenu : BaseMenu() {
     private lateinit var adapter: SsidAdapter
     private lateinit var loadingText: TextView
     private lateinit var loadingProgress: ProgressBar
+    private lateinit var resolver: AppInfoResolver
+
     private val allItems = mutableListOf<SsidProto.PackageSsid>()
     private val filteredItems = mutableListOf<SsidProto.PackageSsid>()
     private var isLoading = false
@@ -50,14 +53,19 @@ class AndroidIdMenu : BaseMenu() {
             return
         }
 
-        view.findViewById<ImageView>(R.id.btn_back).setOnClickListener { parentFragmentManager.popBackStack() }
+        resolver = AppInfoResolver(requireContext())
+
+        view.findViewById<ImageView>(R.id.btn_back).setOnClickListener {
+            parentFragmentManager.popBackStack() }
         view.findViewById<TextView>(R.id.bar_title).text = title()
+
         recyclerView = view.findViewById(R.id.rec)
         searchEdit = view.findViewById(R.id.search)
         loadingText = view.findViewById(R.id.loading_txt)
         loadingProgress = view.findViewById(R.id.loading_progress)
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
-        adapter = SsidAdapter(filteredItems, { item -> showEditDialog(item) }, getThemeColor())
+
+        adapter = SsidAdapter(filteredItems, resolver, { item -> showEditDialog(item) }, getThemeColor())
         recyclerView.adapter = adapter
 
         searchEdit.addTextChangedListener(object : TextWatcher {
@@ -67,9 +75,11 @@ class AndroidIdMenu : BaseMenu() {
                 searchText = s?.toString()?.lowercase() ?: ""
                 searchHandler.removeCallbacksAndMessages(null)
                 searchHandler.postDelayed({
-                    if (!isLoading && searchText == (searchEdit.text.toString().lowercase())) {
-                        filterItems(searchText) }
-                }, 300) }
+                    if (!isLoading && searchText == searchEdit.text.toString().lowercase()) {
+                        filterItems(searchText)
+                    }
+                }, 300)
+            }
             override fun afterTextChanged(s: Editable?) {}
         })
 
@@ -84,27 +94,35 @@ class AndroidIdMenu : BaseMenu() {
         loadingProgress.visibility = View.VISIBLE
         recyclerView.visibility = View.GONE
         searchEdit.isEnabled = false
+
         Thread {
             try {
                 val items = if (RootUtils.fileExists(ssidFilePath)) {
                     SsidProto.parseFile(ssidFilePath)
-                } else { emptyList() }
+                } else {
+                    emptyList()
+                }
                 allItems.clear()
                 allItems.addAll(items.sortedBy { it.packageName })
-                handler.post { isLoading = false
+
+                handler.post {
+                    isLoading = false
                     searchEdit.isEnabled = true
                     loadingText.visibility = View.GONE
                     loadingProgress.visibility = View.GONE
                     recyclerView.visibility = View.VISIBLE
                     filterItems(searchText)
-                    showToast("[+] Loaded (${allItems.size}) apps.") }
+                    showToast("[+] Loaded (${allItems.size}) apps.")
+                }
             } catch (_: Exception) {
-                handler.post { isLoading = false
+                handler.post {
+                    isLoading = false
                     searchEdit.isEnabled = true
                     loadingText.visibility = View.GONE
                     loadingProgress.visibility = View.GONE
                     recyclerView.visibility = View.VISIBLE
-                    showToast(getString(R.string.error_loading)) }
+                    showToast(getString(R.string.error_loading))
+                }
             }
         }.start()
     }
@@ -117,13 +135,17 @@ class AndroidIdMenu : BaseMenu() {
             if (query.isEmpty()) {
                 filteredItems.addAll(allItems)
             } else {
-                val lowerQuery = query.lowercase()
+                val q = query.lowercase()
                 filteredItems.addAll(
-                    allItems.filter { it.packageName.lowercase().contains(lowerQuery) || it.ssid.lowercase().contains(lowerQuery)
-                    }) }
+                    allItems.filter { item ->
+                        item.packageName.lowercase().contains(q) || item.ssid.lowercase().contains(q) || resolver.resolveLabel(item.packageName).lowercase().contains(q)
+                    }
+                )
+            }
             adapter.notifyDataSetChanged()
-        } catch (_: Exception) { }
+        } catch (_: Exception) {}
     }
+
 
     @SuppressLint("InflateParams")
     private fun showEditDialog(item: SsidProto.PackageSsid) {
@@ -139,6 +161,7 @@ class AndroidIdMenu : BaseMenu() {
         val cancelBtn: MaterialButton = dialogView.findViewById(R.id.btn_cancel)
         val applyBtn: MaterialButton = dialogView.findViewById(R.id.btn_apply)
         val applyRebootBtn: MaterialButton = dialogView.findViewById(R.id.btn_apply_reboot)
+
         val isAndroidPackage = item.packageName == "android"
         val newRandomId = SsidProto.generateRandomId(isAndroidPackage)
 
@@ -150,8 +173,10 @@ class AndroidIdMenu : BaseMenu() {
 
         val editCard: MaterialCardView = editText.parent as MaterialCardView
         editCard.strokeColor = color
-        cancelBtn.setOnClickListener { dialog.dismiss() }
+
         cancelBtn.strokeColor = android.content.res.ColorStateList.valueOf(color)
+        cancelBtn.setOnClickListener { dialog.dismiss() }
+
         applyBtn.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
         applyBtn.setOnClickListener {
             val newValue = editText.text.toString().trim()
@@ -171,28 +196,36 @@ class AndroidIdMenu : BaseMenu() {
         }
 
         dialog.show()
-        dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.9).toInt(), WindowManager.LayoutParams.WRAP_CONTENT)
+        dialog.window?.setLayout(
+            (resources.displayMetrics.widthPixels * 0.9).toInt(),
+            WindowManager.LayoutParams.WRAP_CONTENT
+        )
     }
+
 
     private fun updateItem(packageName: String, newValue: String, shouldReboot: Boolean) {
         Thread {
             try {
                 val success = SsidProto.updateFile(ssidFilePath, packageName, newValue)
                 if (success) {
-                    Shell.cmd("am force-stop $packageName 2>/dev/null").exec() }
+                    Shell.cmd("am force-stop $packageName 2>/dev/null").exec()
+                }
                 handler.post {
                     if (success) {
                         if (shouldReboot) {
                             showToast(getString(R.string.rebooting))
                             handler.postDelayed({ Shell.cmd("reboot").submit() }, 1000)
-                        } else { showToast(getString(R.string.ssaid_updated))
+                        } else {
+                            showToast(getString(R.string.ssaid_updated))
                         }
-                    } else { showToast(getString(R.string.update_fail)) }
+                    } else {
+                        showToast(getString(R.string.update_fail))
+                    }
                     loadItems()
                 }
             } catch (_: Exception) {
-                handler.post {
-                    showToast(getString(R.string.update_fail)) } }
+                handler.post { showToast(getString(R.string.update_fail)) }
+            }
         }.start()
     }
 
@@ -201,6 +234,7 @@ class AndroidIdMenu : BaseMenu() {
 
 
 class SsidAdapter(private val items: List<SsidProto.PackageSsid>,
+    private val resolver: AppInfoResolver,
     private val onEdit: (SsidProto.PackageSsid) -> Unit,
     private val themeColor: String) : RecyclerView.Adapter<SsidAdapter.ViewHolder>() {
 
@@ -220,14 +254,12 @@ class SsidAdapter(private val items: List<SsidProto.PackageSsid>,
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
-        try {
-            val drawable = holder.icon.context.packageManager.getApplicationIcon(item.packageName)
-            holder.icon.setImageDrawable(drawable)
-        } catch (_: PackageManager.NameNotFoundException) {
-            holder.icon.setImageResource(android.R.drawable.sym_def_app_icon)
-        }
-        holder.label.text = item.packageName.split('.').last().replaceFirstChar { it.uppercase() }
+        val info = resolver.resolve(item.packageName)
+
+        holder.icon.setImageDrawable(info.icon)
+        holder.label.text = info.label
         holder.pkg.text = item.packageName
+
         val color = themeColor.toColorInt()
         holder.card.strokeColor = color
         holder.card.strokeWidth = 2
@@ -236,5 +268,4 @@ class SsidAdapter(private val items: List<SsidProto.PackageSsid>,
     }
 
     override fun getItemCount(): Int = items.size
-
 }
