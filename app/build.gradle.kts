@@ -7,15 +7,15 @@ plugins {
 android {
     namespace = "com.islavikfx.spoof"
     compileSdk {
-        version = release(37)
+        version = release(version = 37)
     }
     defaultConfig {
         //noinspection EditedTargetSdkVersion
         applicationId = "com.islavikfx.spoof"
         minSdk = 27
         targetSdk = 37
-        versionCode = 130
-        versionName = "1.3.0"
+        versionCode = 140
+        versionName = "1.4.0"
         androidResources {
             @Suppress("UnstableApiUsage")
             this.localeFilters.add("en")
