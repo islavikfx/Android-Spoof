@@ -2,8 +2,8 @@
 <resources>
     <!-- main -->
     <string name="app_name">Android Spoof</string>
-    <string name="footer_made_by">Copyright iSlavik (@islavikfx). Release 18 October 2026.</string>
-    <string name="footer_open_source">Open Source (Build v1.3.0).</string>
+    <string name="footer_made_by">Copyright iSlavik (@islavikfx). Release 14 November 2026.</string>
+    <string name="footer_open_source">Open Source (Build v1.4.0).</string>
     <!-- common -->
     <string name="action_apply">APPLY</string>
     <string name="action_ok">OK</string>
@@ -98,5 +98,5 @@
     <string name="app_stop_fail">[-] Failed to stop.</string>
     <!-- changelog -->
     <string name="changelog_title">Changelog:</string>
-    <string name="changelog_body">// v1.3.0 (18 October 2026):\n\n[~] Settings Menu: Full rework (added light theme to app, updated checkbox for system clear);\n[~] Apps Menu: Full rework (removed old scan method, added new parser with *pm* command;\n[~] Props Menu: Improved, fixed bug with text input.\n[%] Global: Updated compile options, Manifest permissions, whole app .xml files (light theme / UI), optimization. Fixed bugs.\n\n[/] Send bugs or ideas at GitHub issues page ;)</string>
+    <string name="changelog_body">// v1.4.0 (14 November 2026):\n\n[~] Props Menu: Corrected text input for warnings / Magisk module.\n[~] Android ID Menu: Improved parser for system .xml (new scan method with "pm" for package icons / name using Java).\n[~] Configure Device Apps Menu: Reworked parser using Java (AppInfoResolver.java).\n[%] Global: Added new system parser for Apps/AID, removed Unit / Instrumented Kotlin files; Updated compile options (API 37) and added some improvements.\n\n[/] Send bugs or ideas at GitHub issues page ;)</string>
 </resources>
