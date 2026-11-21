@@ -1,261 +1,302 @@
 package com.islavikfx.spoof.utils;
-import android.content.Context;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
-import android.graphics.drawable.Drawable;
+import android.util.Base64;
 import androidx.annotation.NonNull;
 import com.topjohnwu.superuser.Shell;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
-public final class AppInfoResolver {
+public final class SsidProto {
 
-    public static final class AppInfo {
+    private SsidProto() { }
+
+    public static final class PackageSsid {
         private final String packageName;
-        private final String label;
-        private final Drawable icon;
-        private final String primaryApk;
-        private volatile List<String> permissions;
-        private volatile boolean permissionsLoaded;
+        private final String ssid;
+        private final String defaultValue;
+        private final boolean defaultSysSet;
 
-        public AppInfo(@NonNull String packageName, @NonNull String label,
-         @NonNull Drawable icon, @NonNull String primaryApk) {
+        public PackageSsid(@NonNull String packageName, @NonNull String ssid, @NonNull String defaultValue, boolean defaultSysSet) {
             this.packageName = packageName;
-            this.label = label;
-            this.icon = icon;
-            this.primaryApk = primaryApk;
+            this.ssid = ssid;
+            this.defaultValue = defaultValue;
+            this.defaultSysSet = defaultSysSet;
         }
 
-        @NonNull  public String  getPackageName() {
+        public String getPackageName() {
             return packageName; }
-        @NonNull  public String  getLabel() {
-            return label; }
-        @NonNull  public Drawable getIcon() {
-            return icon; }
-        @NonNull  public String  getPrimaryApk() {
-            return primaryApk; }
+        public String getSsid() {
+            return ssid; }
+        public String getDefaultValue() {
+            return defaultValue; }
+        public boolean getDefaultSysSet() {
+            return defaultSysSet; }
 
-        @NonNull
-        public List<String> getPermissions() {
-            List<String> p = permissions;
-            return p != null ? p : Collections.emptyList();
+        @NonNull @Override public String toString() {
+            return "PackageSsid{" + packageName + "=" + ssid + "}";
         }
 
-        public boolean arePermissionsLoaded() {
-            return permissionsLoaded; }
-
-        void setPermissions(@NonNull List<String> perms) {
-            this.permissions = Collections.unmodifiableList(perms);
-            this.permissionsLoaded = true;
+        @Override public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof PackageSsid)) return false;
+            PackageSsid that = (PackageSsid) o;
+            return defaultSysSet == that.defaultSysSet
+                    && packageName.equals(that.packageName)
+                    && ssid.equals(that.ssid)
+                    && defaultValue.equals(that.defaultValue);
         }
-    }
 
-    private final Context appContext;
-    private final PackageManager pm;
-    private final Drawable fallbackIcon;
-    private final Map<String, AppInfo> cache = new ConcurrentHashMap<>();
-
-    public AppInfoResolver(@NonNull Context context) {
-        this.appContext = context.getApplicationContext();
-        this.pm = appContext.getPackageManager();
-        this.fallbackIcon = pm.getDefaultActivityIcon();
-    }
-
-    @NonNull
-    public AppInfo resolve(@NonNull String packageName) {
-        AppInfo cached = cache.get(packageName);
-        if (cached != null) return cached;
-
-        AppInfo built = buildInfo(packageName);
-        AppInfo prev = cache.putIfAbsent(packageName, built);
-        return prev != null ? prev : built;
-    }
-
-    @NonNull
-    public String resolveLabel(@NonNull String packageName) {
-        return resolve(packageName).getLabel();
-    }
-
-    @NonNull
-    public Drawable resolveIcon(@NonNull String packageName) {
-        return resolve(packageName).getIcon();
-    }
-
-    @NonNull
-    public List<String> resolvePermissions(@NonNull String packageName) {
-        AppInfo info = resolve(packageName);
-        if (info.arePermissionsLoaded()) return info.getPermissions();
-
-        synchronized (info) {
-            if (info.arePermissionsLoaded()) return info.getPermissions();
-            List<String> perms = loadPermissions(packageName, info.getPrimaryApk());
-            info.setPermissions(perms);
-            return perms;
+        @Override public int hashCode() {
+            int h = packageName.hashCode();
+            h = 31 * h + ssid.hashCode();
+            h = 31 * h + defaultValue.hashCode();
+            h = 31 * h + (defaultSysSet ? 1 : 0);
+            return h;
         }
     }
 
+
     @NonNull
-    public List<AppInfo> listAll(boolean skipSystem) {
-        List<AppInfo> out = new ArrayList<>();
+    public static String generateRandomId(boolean isAndroidPackage) {
+        String chars = isAndroidPackage ? "0123456789ABCDEF" : "0123456789abcdef";
+        int length = isAndroidPackage ? 64 : 17;
+        StringBuilder sb = new StringBuilder(length);
+        java.util.Random rnd = new java.util.Random();
+        for (int i = 0; i < length; i++) {
+            sb.append(chars.charAt(rnd.nextInt(chars.length())));
+        }
+        return sb.toString();
+    }
 
-        List<String> packages = listPackageNames();
-        for (String pkg : packages) {
-            if (pkg.isEmpty() || !pkg.contains(".")) continue;
 
-            if (skipSystem) {
-                try {
-                    ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
-                    if ((ai.flags & ApplicationInfo.FLAG_SYSTEM) != 0) continue;
-                } catch (PackageManager.NameNotFoundException ignored) {
+    @NonNull
+    public static List<PackageSsid> parseFile(@NonNull String filePath) {
+        List<PackageSsid> result = new ArrayList<>();
+        try {
+            String xmlContent = readFileContent(filePath);
+            if (!xmlContent.isEmpty()) {
+                if (isAbxFile(filePath)) {
+                    String decoded = decodeAbxToXml(filePath);
+                    if (!decoded.isEmpty()) parseXmlContent(decoded, result);
+                } else {
+                    parseXmlContent(xmlContent, result);
                 }
             }
+        } catch (Exception ignored) {}
 
-            out.add(resolve(pkg));
+        if (result.isEmpty()) {
+            tryParseBinaryRaw(filePath, result);
         }
+        return result;
+    }
 
-        Collections.sort(out, new Comparator<AppInfo>() {
-            @Override public int compare(AppInfo a, AppInfo b) {
-                return a.getLabel().compareToIgnoreCase(b.getLabel());
-            }
-        });
-        return out;
+    private static boolean isAbxFile(@NonNull String filePath) {
+        try {
+            Shell.Result r = Shell.cmd("head -c 3 " + filePath + " 2>/dev/null").exec();
+            return r.isSuccess() && !r.getOut().isEmpty() && r.getOut().get(0).startsWith("ABX");
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     @NonNull
-    public List<AppInfo> listAll() {
-        return listAll(false);
-    }
-
-
-    public void invalidate(@NonNull String packageName) {
-        cache.remove(packageName);
-    }
-
-    public void invalidateAll() {
-        cache.clear();
-    }
-
-    @NonNull
-    private AppInfo buildInfo(@NonNull String packageName) {
-        String label = packageName.substring(packageName.lastIndexOf('.') + 1);
-        Drawable icon = fallbackIcon;
-        String primaryApk = "";
-
-        boolean pmResolved = false;
+    private static String readFileContent(@NonNull String filePath) {
         try {
-            ApplicationInfo ai = pm.getApplicationInfo(packageName, 0);
-            CharSequence l = pm.getApplicationLabel(ai);
-            if (l != null && l.length() > 0) label = l.toString();
-            Drawable d = ai.loadIcon(pm);
-            if (d != null) icon = d;
-            pmResolved = true;
-        } catch (PackageManager.NameNotFoundException ignored) { }
-
-        primaryApk = resolvePrimaryApk(packageName);
-
-        if (!primaryApk.isEmpty() && !pmResolved) {
-            try {
-                PackageInfo archive = pm.getPackageArchiveInfo(
-                        primaryApk, PackageManager.GET_PERMISSIONS);
-                if (archive != null && archive.applicationInfo != null) {
-                    ApplicationInfo aai = archive.applicationInfo;
-                    aai.sourceDir = primaryApk;
-                    aai.publicSourceDir = primaryApk;
-                    try {
-                        CharSequence l = pm.getApplicationLabel(aai);
-                        if (l != null && l.length() > 0) label = l.toString();
-                    } catch (Exception ignored) {}
-                    try {
-                        Drawable d = aai.loadIcon(pm);
-                        if (d != null) icon = d;
-                    } catch (Exception ignored) { }
-                }
-            } catch (Exception ignored) { }
-        }
-
-        return new AppInfo(packageName, label, icon, primaryApk);
-    }
-
-    @NonNull
-    private List<String> loadPermissions(@NonNull String packageName, @NonNull String primaryApk) {
-        try {
-            PackageInfo pi = pm.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS);
-            if (pi != null && pi.requestedPermissions != null) {
-                return copyOf(pi.requestedPermissions);
+            Shell.Result r = Shell.cmd("cat " + filePath + " 2>/dev/null").exec();
+            if (r.isSuccess() && !r.getOut().isEmpty()) {
+                return String.join("\n", r.getOut());
             }
-            return Collections.emptyList();
-        } catch (PackageManager.NameNotFoundException ignored) {
-        }
-
-        if (!primaryApk.isEmpty()) {
-            try {
-                PackageInfo archive = pm.getPackageArchiveInfo(
-                        primaryApk, PackageManager.GET_PERMISSIONS);
-                if (archive != null && archive.requestedPermissions != null) {
-                    return copyOf(archive.requestedPermissions);
-                }
-            } catch (Exception ignored) {}
-        }
-        return Collections.emptyList();
-    }
-
-    @NonNull
-    private String resolvePrimaryApk(@NonNull String packageName) {
-        try {
-            ApplicationInfo ai = pm.getApplicationInfo(packageName, 0);
-            if (ai.sourceDir != null && !ai.sourceDir.isEmpty()) {
-                return ai.sourceDir;
-            }
-        } catch (PackageManager.NameNotFoundException ignored) {
-        }
-
-        try {
-            Shell.Result r = Shell.cmd("pm path " + packageName).exec();
-            if (!r.isSuccess()) return "";
-            String first = "";
-            for (String line : r.getOut()) {
-                String p = line.startsWith("package:") ? line.substring(8).trim() : line.trim();
-                if (p.isEmpty()) continue;
-                if (p.contains("split_config")) continue;
-                if (p.contains("/base.apk")) return p;
-                if (first.isEmpty()) first = p;
-            }
-            return first;
+            return "";
         } catch (Exception e) {
             return "";
         }
     }
 
     @NonNull
-    private List<String> listPackageNames() {
+    private static String decodeAbxToXml(@NonNull String filePath) {
+        final String tmp = "/data/local/tmp/ssid_temp.xml";
         try {
-            Shell.Result r = Shell.cmd("pm list packages").exec();
-            if (!r.isSuccess()) return Collections.emptyList();
-
-            List<String> out = new ArrayList<>(r.getOut().size());
-            for (String line : r.getOut()) {
-                String pkg = line.startsWith("package:")
-                        ? line.substring(8).trim()
-                        : line.trim();
-                if (pkg.isEmpty() || !pkg.contains(".")) continue;
-                out.add(pkg);
+            Shell.cmd("rm -f " + tmp).exec();
+            Shell.Result r = Shell.cmd("abx2xml " + filePath + " " + tmp + " 2>/dev/null && cat " + tmp + " 2>/dev/null").exec();
+            Shell.cmd("rm -f " + tmp).exec();
+            if (r.isSuccess() && !r.getOut().isEmpty()) {
+                return String.join("\n", r.getOut());
             }
-            return out;
+            return "";
         } catch (Exception e) {
-            return Collections.emptyList();
+            return "";
         }
     }
 
-    @NonNull
-    private static List<String> copyOf(@NonNull String[] arr) {
-        List<String> list = new ArrayList<>(arr.length);
-        Collections.addAll(list, arr);
-        return Collections.unmodifiableList(list);
+    private static void parseXmlContent(@NonNull String content, @NonNull List<PackageSsid> result) {
+        try {
+            Pattern p = Pattern.compile("<setting\\s+[^>]*package=\"([^\"]+)\"[^>]*value=\"([^\"]+)\"[^>]*(?:defaultValue=\"([^\"]*)\")?[^>]*(?:defaultSysSet=\"([^\"]*)\")?[^>]*>");
+            Matcher m = p.matcher(content);
+            while (m.find()) {
+                String pkg = m.group(1);
+                String value = m.group(2);
+                String def = m.group(3);
+                boolean sysSet = "true".equals(m.group(4));
+                if (pkg != null && !pkg.isEmpty()
+                        && value != null && !value.isEmpty()) {
+                    result.add(new PackageSsid(pkg, value,
+                            (def == null || def.isEmpty()) ? value : def, sysSet));
+                }
+            }
+        } catch (Exception ignored) { }
+    }
+
+    private static void tryParseBinaryRaw(@NonNull String filePath, @NonNull List<PackageSsid> result) {
+        try {
+            Shell.Result r = Shell.cmd("cat " + filePath + " | base64").exec();
+            if (!r.isSuccess() || r.getOut().isEmpty()) return;
+
+            byte[] raw = Base64.decode(String.join("", r.getOut()), Base64.DEFAULT);
+            String content = new String(raw, StandardCharsets.ISO_8859_1);
+
+            int userKeyIdx = content.indexOf("userkey");
+            if (userKeyIdx != -1) {
+                String after = content.substring(userKeyIdx);
+                Matcher hex64 = Pattern.compile("[A-Fa-f0-9]{64}").matcher(after);
+                if (hex64.find()) {
+                    String v = hex64.group();
+                    result.add(new PackageSsid("android", v, v, true));
+                }
+            }
+
+            Pattern pkgPattern = Pattern.compile("([a-z][a-z0-9_]+\\.[a-z][a-z0-9_.]+)");
+            Pattern hexPattern = Pattern.compile("[A-Fa-f0-9]{16,17}");
+            Set<String> found = new HashSet<>();
+            found.add("android");
+
+            Matcher hexM = hexPattern.matcher(content);
+            while (hexM.find()) {
+                String hexId = hexM.group();
+                int idx = hexM.start();
+                int start = Math.max(0, idx - 200);
+                int end = Math.min(content.length(), idx + 200);
+                Matcher pkgM = pkgPattern.matcher(content.substring(start, end));
+                if (pkgM.find()) {
+                    String pkg = pkgM.group(1);
+                    if (!found.contains(pkg) && pkg.contains(".") && !pkg.endsWith(".")) {
+                        found.add(pkg);
+                        result.add(new PackageSsid(pkg, hexId, hexId, false));
+                    }
+                }
+            }
+        } catch (Exception ignored) { }
+    }
+
+
+    public static boolean updateFile(@NonNull String filePath, @NonNull String packageName, @NonNull String newValue) {
+        try {
+            if (updateViaAbx(filePath, packageName, newValue)) return true;
+            return updateBinaryDirect(filePath, packageName, newValue);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static boolean updateViaAbx(@NonNull String filePath, @NonNull String packageName, @NonNull String newValue) {
+        final String work = "/data/local/tmp/ssid_work.xml";
+        final String workNew = "/data/local/tmp/ssid_work_new.xml";
+        try {
+            Shell.cmd("rm -f " + work + " " + workNew).exec();
+
+            if (isAbxFile(filePath)) {
+                Shell.Result r = Shell.cmd("abx2xml " + filePath + " " + work + " 2>/dev/null && cat " + work).exec();
+                if (!r.isSuccess() || r.getOut().isEmpty()) return false;
+            } else {
+                Shell.Result r = Shell.cmd("cp " + filePath + " " + work + " 2>/dev/null && cat " + work).exec();
+                if (!r.isSuccess() || r.getOut().isEmpty()) return false;
+            }
+
+            String sedExpr = "/package=\"" + packageName + "\"/ { " + "s/value=\"[^\"]*\"/value=\"" + newValue + "\"/; " + "s/defaultValue=\"[^\"]*\"/defaultValue=\"" + newValue + "\"/; " + "}";
+            Shell.cmd("sed -i '" + sedExpr + "' " + work).exec();
+            if (isAbxFile(filePath)) {
+                Shell.cmd("xml2abx " + work + " " + filePath).exec();
+            } else {
+                Shell.cmd("cp " + work + " " + filePath).exec();
+            }
+
+            String fallback = filePath + ".fallback";
+            Shell.cmd("cp " + filePath + " " + fallback).exec();
+            fixOwnership(filePath);
+            fixOwnership(fallback);
+
+            Shell.cmd("rm -f " + work + " " + workNew).exec();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+
+    private static boolean updateBinaryDirect(@NonNull String filePath, @NonNull String packageName, @NonNull String newValue) {
+        try {
+            Shell.Result r = Shell.cmd("cat " + filePath + " | base64").exec();
+            if (!r.isSuccess() || r.getOut().isEmpty()) return false;
+
+            byte[] raw = Base64.decode(String.join("", r.getOut()), Base64.DEFAULT);
+
+            List<PackageSsid> data = parseFile(filePath);
+            PackageSsid item = null;
+            for (PackageSsid it : data) {
+                if (it.getPackageName().equals(packageName)) {item = it; break; }
+            }
+            if (item == null) return false;
+
+            byte[] newBytes = newValue.getBytes(StandardCharsets.ISO_8859_1);
+            byte[] modified = replaceInBytes(raw,
+                    item.getSsid().getBytes(StandardCharsets.ISO_8859_1), newBytes);
+
+            if (!item.getDefaultValue().isEmpty()
+                    && !item.getDefaultValue().equals(item.getSsid())) {
+                modified = replaceInBytes(modified,
+                        item.getDefaultValue().getBytes(StandardCharsets.ISO_8859_1), newBytes);
+            }
+
+            String encoded = Base64.encodeToString(modified, Base64.DEFAULT);
+            Shell.cmd("echo '" + encoded + "' | base64 -d > " + filePath).exec();
+            String fallback = filePath + ".fallback";
+            Shell.cmd("cp " + filePath + " " + fallback).exec();
+            fixOwnership(filePath);
+            fixOwnership(fallback);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static void fixOwnership(@NonNull String path) {
+        Shell.cmd("chown system:system " + path).exec();
+        Shell.cmd("chmod 660 " + path).exec();
+        Shell.cmd("restorecon " + path + " 2>/dev/null || true").exec();
+        Shell.cmd("sync").exec();
+    }
+
+    private static byte[] replaceInBytes(@NonNull byte[] data, @NonNull byte[] oldBytes, @NonNull byte[] newBytes) {
+        if (oldBytes.length == 0) return data;
+
+        byte[] paddedNew = new byte[oldBytes.length];
+        System.arraycopy(newBytes, 0, paddedNew, 0, Math.min(newBytes.length, oldBytes.length));
+
+        byte[] out = data.clone();
+        int limit = out.length - oldBytes.length;
+
+        outer:
+        for (int pos = 0; pos <= limit; pos++) {
+            for (int j = 0; j < oldBytes.length; j++) {
+                if (out[pos + j] != oldBytes[j]) continue outer;
+            }
+            System.arraycopy(paddedNew, 0, out, pos, paddedNew.length);
+            return out;
+        }
+        return data;
     }
 }
